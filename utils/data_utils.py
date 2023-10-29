@@ -1,17 +1,24 @@
+import re
 import os
 import uuid
 import requests
-from tqdm.notebook import tqdm
 
 import duckdb
 import geojson
 import overpass
+import swifter
+
+import numpy as np
 import pandas as pd
 import geopandas as gpd
-from utils import config_utils
+import config_utils
 
-from country_bounding_boxes import country_subunits_by_iso_code
+from tqdm.notebook import tqdm
 from pyproj import Proj, Transformer
+from scipy.sparse.csgraph import connected_components
+from country_bounding_boxes import country_subunits_by_iso_code
+
+pd.options.mode.chained_assignment = None
 
 
 def _makedir(out_dir):
@@ -33,6 +40,23 @@ def _load_data_config(filename="configs/data_config.yaml"):
     return data_config
 
 
+def _get_iso_regions(data, iso_code):
+    """Adds country, region, and subregion to dataframe."""
+    
+    # Load ISO codes of countries and regions/subregions
+    data_config = _load_data_config()
+    url = data_config["ISO_REGIONAL_CODES"]
+    codes = pd.read_csv(url)
+    
+    subcode = codes.query(f"`alpha-3` == '{iso_code}'")
+    data["iso"] = iso_code
+    data["country"] = subcode["name"].values[0]
+    data["subregion"] = subcode["sub-region"].values[0]
+    data["region"] = subcode["region"].values[0]
+    
+    return data
+
+
 def _convert_to_crs(data, src_crs="EPSG:4326", target_crs="EPSG:3857"):
     """Converts GeoDataFrame to CRS."""
     
@@ -51,15 +75,43 @@ def _convert_to_crs(data, src_crs="EPSG:4326", target_crs="EPSG:3857"):
     return data
 
 
+def _concat_data(data, out_file, verbose=True):
+    data = pd.concat(data).reset_index(drop=True)
+    data = gpd.GeoDataFrame(data, geometry=data["geometry"], crs="EPSG:4326")
+    data.to_file(out_file, driver="GeoJSON")
+    
+    if verbose:
+        print(f"Data dimensions: {data.shape}, CRS: {data.crs}")
+        print(f"Generated {out_file}")
+    
+    return data
+
+
+def _generate_uid(data, category):
+    """Generates a unique id based on source, iso, and category. """
+    
+    data['index'] = data.index.to_series().apply(lambda x: str(x).zfill(8))
+    data['category'] = category
+    uids = data[['source', 'iso', 'category', 'index']].agg('-'.join, axis=1)
+    data = data.drop(['index', 'category'], axis=1)
+    data["UID"] = uids
+    return data
+
+
 def _get_geoboundaries(iso_code, out_dir="data/geoboundary", adm_level="ADM0"):
     """Fetches the geoboundary given an ISO code"""
     
     # Query geoBoundaries
     out_dir = _makedir(out_dir)
     data_config = _load_data_config()
-    url = f"{data_config['GEOBOUNDARIES_URL']}{iso_code}/{adm_level}/"
-    r = requests.get(url)
-    download_path = r.json()["gjDownloadURL"]
+    try:
+        url = f"{data_config['GEOBOUNDARIES_URL']}{iso_code}/{adm_level}/"
+        r = requests.get(url)
+        download_path = r.json()["gjDownloadURL"]
+    except:
+        url = f"{data_config['GEOBOUNDARIES_URL']}{iso_code}/ADM0/"
+        r = requests.get(url)
+        download_path = r.json()["gjDownloadURL"]
 
     # Save the result as a GeoJSON
     filename = f"{iso_code}_geoboundary.geojson"
@@ -73,18 +125,100 @@ def _get_geoboundaries(iso_code, out_dir="data/geoboundary", adm_level="ADM0"):
     return geoboundary
 
 
+def _connect_components(data, buffer_size, optimize=False):
+    # Dissolve overlapping geometries
+    # based on: https://gis.stackexchange.com/a/271737
+    data_config = _load_data_config()
+    temp = _convert_to_crs(data, target_crs="EPSG:3857")
+    geometry = temp['geometry'].buffer(buffer_size)
+    overlap_matrix = geometry.apply(lambda x: geometry.overlaps(x)).values.astype(int)
+    n, groups = connected_components(overlap_matrix, directed=False)
+    data['group'] = groups
+    
+    # Prioritize by: OVERTURE, OSM, UNICEF
+    data['temp_source'] = pd.Categorical(
+        data['source'], 
+        categories=['OVERTURE','OSM','UNICEF'], 
+        ordered=True
+    )
+    data = data.sort_values('temp_source', ascending=True).drop_duplicates(['group'])
+    data = data.reset_index(drop=True)
+    columns = data_config["COLUMNS"]
+    if 'giga_id_school' in data.columns:
+        columns = columns + ['giga_id_school']
+    data = data[columns]
+    return data
+
+
+def deduplicate_data(
+    data_dir, 
+    out_dir, 
+    out_file="clean.geojson",
+    iso_codes=None, 
+    buffer_size=30
+):
+    data_dir = _makedir(data_dir)
+    out_dir = _makedir(out_dir)
+    files = next(os.walk(data_dir), (None, None, []))[2]
+    files = [file for file in files if file != out_file]
+        
+    data = []
+    for file in files:
+        filename = os.path.join(data_dir, file)
+        subdata = gpd.read_file(filename)
+        data.append(subdata)
+    
+    data = gpd.GeoDataFrame(pd.concat(data).copy(), crs="EPSG:4326") 
+    data = data.drop_duplicates('geometry', keep="first")
+    if not iso_codes:
+        iso_codes = data.iso.unique()
+    
+    out_data = []
+    pbar1 = tqdm(enumerate(iso_codes), total=len(iso_codes))
+    for iter, iso_code in pbar1:
+        pbar1.set_description(f"Processing {iso_code}")
+        subdata = data[data["iso"] == iso_code].reset_index(drop=True)
+        
+        # Fetch geoboundaries with admin level 1
+        columns = ['shapeName', 'geometry']
+        geoboundaries = _get_geoboundaries(iso_code, adm_level="ADM1")[columns]
+        geoboundaries = geoboundaries.dropna(subset=['shapeName'])
+        subdata = subdata.sjoin(geoboundaries, how="left", predicate="within")
+        
+        # Split the data into smaller admin boundaries
+        out_subdata = []
+        for shape_name in subdata.shapeName.unique():   
+            pbar1.set_description(f"Processing {iso_code} {shape_name}")
+            subsubdata = subdata[subdata["shapeName"] == shape_name]
+            subsubdata = subsubdata.drop(["index_right", "shapeName"], axis=1)
+            subsubdata = subsubdata.reset_index(drop=True)
+            if len(subsubdata) > 0:
+                subsubdata = _connect_components(subsubdata, buffer_size)    
+                out_subdata.append(subsubdata)        
+        
+        # Save cleaned file
+        filename = f"{iso_code}_clean.geojson"
+        out_subfile = os.path.join(out_dir, filename)
+        out_subdata = _concat_data(out_subdata, out_subfile, verbose=False)
+        out_data.append(out_subdata)
+    
+    # Save combined dataset
+    out_dir = os.path.dirname(out_dir)
+    out_file = os.path.join(out_dir, out_file)
+    data = _concat_data(out_data, out_file)
+    return data
+
+
 def _query_osm(iso_code, out_file, query):
     """Queries OSM for a given ISO code."""
     
     api = overpass.API(timeout=1500)
-    data = api.get(
-        f"""
+    osm_query = f"""
         area["ISO3166-1"="{iso_code}"][admin_level=2];
         ({query});
         out center;
-    """,
-        verbosity="geom",
-    )
+    """
+    data = api.get(osm_query, verbosity="geom")
     with open(out_file, "w") as file:
         geojson.dump(data, file)
 
@@ -92,7 +226,7 @@ def _query_osm(iso_code, out_file, query):
     return data
 
 
-def download_osm(iso_codes, out_dir, category="SCHOOL"):
+def download_osm(iso_codes, out_dir, out_file="osm.geojson", category="SCHOOL"):
     """Downloads OSM POIs based on a list of ISO codes."""
     
     out_dir = _makedir(out_dir)
@@ -103,12 +237,11 @@ def download_osm(iso_codes, out_dir, category="SCHOOL"):
     keywords = data_config[category]
     query = "".join(
         [f"""
-        node["{key}"="{keyword}"](area);
-        way["{key}"="{keyword}"](area);
-        rel["{key}"="{keyword}"](area);
+        node["{key}"~"^({"|".join(values)})"](area);
+        way["{key}"~"^({"|".join(values)})"](area);
+        rel["{key}"~"^({"|".join(values)})"](area);
         """
-            for key, values in keywords.items()
-            for keyword in values
+        for key, values in keywords.items()
         ]
     )
 
@@ -123,27 +256,20 @@ def download_osm(iso_codes, out_dir, category="SCHOOL"):
             alpha_2 = codes.query(f"`alpha-3` == '{iso_code}'")["alpha-2"].values[0]
             _query_osm(alpha_2, out_file, query)
 
-        subdata = gpd.read_file(out_file)
-        if len(subdata) > 0:
-            subdata["iso"] = iso_code
+        subdata = gpd.read_file(out_file).reset_index(drop=True)
+        if (len(subdata) > 0) and ('name' in subdata.columns):   
             subdata["source"] = "OSM"
-            subdata = subdata[['iso', 'source', 'name', 'geometry']]
+            subdata = subdata.drop_duplicates('geometry', keep="first")
+            subdata = _get_iso_regions(subdata, iso_code)
+            subdata = _generate_uid(subdata, category)
+            subdata = subdata[data_config["COLUMNS"]]
             subdata.to_file(out_file, driver="GeoJSON")
             data.append(subdata)
 
     # Combine data and save to file
-    data = pd.concat(data)
-    data = gpd.GeoDataFrame(data).reset_index(drop=True)
-    #data["lon"], data["lat"] = data.geometry.x, data.geometry.y
-    uids = data.index.to_series().apply(lambda x: f"osm-{x}")
-    data.insert(loc=0, column='UID', value=uids)
-    print(f"Data dimensions: {data.shape} CRS: {data.crs}")
-
-    # Save dataset
     out_dir = os.path.dirname(out_dir)
-    out_file = os.path.join(out_dir, "osm.geojson")
-    data.to_file(out_file, driver="GeoJSON")
-    print(f"Generated {out_file}")
+    out_file = os.path.join(out_dir, out_file)
+    data = _concat_data(data, out_file)
     return data
 
 
@@ -189,7 +315,7 @@ def _query_overture(iso_code, out_file, query):
     return data
 
 
-def download_overture(iso_codes, out_dir, category="SCHOOL"):
+def download_overture(iso_codes, out_dir, out_file="overture.geojson", category="SCHOOL"):
     """Downloads Overture Map POIs based on a list of ISO codes."""
 
     # Fetch school keywords and generate keywords query
@@ -216,48 +342,36 @@ def download_overture(iso_codes, out_dir, category="SCHOOL"):
             _query_overture(iso_code, out_file, query)
 
         # Post-process data
-        subdata = gpd.read_file(out_file)
+        subdata = gpd.read_file(out_file).reset_index(drop=True)
         if len(subdata) > 0:
-            subdata["iso"] = iso_code
-            subdata["source"] = "OVERTURE"
-            
             if 'names' in subdata.columns:
                 geoboundary = _get_geoboundaries(iso_code)
                 subdata["name"] = subdata["names"].apply(lambda x: x["common"][0]["value"])
                 subdata = gpd.sjoin(subdata, geoboundary, predicate="within")
             
-            subdata = subdata[['iso', 'source', 'name', 'geometry']]
+            subdata["source"] = "OVERTURE"
+            subdata = subdata.drop_duplicates('geometry', keep="first")
+            subdata = _get_iso_regions(subdata, iso_code)
+            subdata = _generate_uid(subdata, category)
+            subdata = subdata[data_config["COLUMNS"]]
             subdata.to_file(out_file, driver="GeoJSON")
             data.append(subdata)
 
     # Combine datasets
-    data = pd.concat(data)
-    data = gpd.GeoDataFrame(data).reset_index(drop=True)
-    #data["lon"], data["lat"] = data.geometry.x, data.geometry.y
-    uids = data.index.to_series().apply(lambda x: f"overture-{x}")
-    data.insert(loc=0, column='UID', value=uids)
-    print(f"Data dimensions: {data.shape} CRS: {data.crs}")
-
-    # Save dataset
     out_dir = os.path.dirname(out_dir)
-    out_file = os.path.join(out_dir, "overture.geojson")
-    data.to_file(out_file, driver="GeoJSON")
-    print(f"Generated {out_file}")
+    out_file = os.path.join(out_dir, out_file)
+    data = _concat_data(data, out_file)
     return data
 
 
-def load_files(data_dir, out_file):
+def load_files(data_dir, out_file, category='SCHOOL'):
     """Combines the UNICEF/Giga datasets into a single CSV file."""
 
     # Load school data files
     data_dir = _makedir(data_dir)
+    data_config = _load_data_config()
     files = next(os.walk(data_dir), (None, None, []))[2]
     print(f"Number of CSV files: {len(files)}")
-
-    # Load ISO codes of countries and regions/subregional codes
-    data_config = _load_data_config()
-    url = data_config["ISO_REGIONAL_CODES"]
-    codes = pd.read_csv(url)
 
     data = []
     pbar = tqdm(enumerate(files), total=len(files))
@@ -268,36 +382,20 @@ def load_files(data_dir, out_file):
 
         # Get iso, country name, region, and sub-region
         iso_code = file.split("_")[0]  # Get ISO code
-        subcode = codes.query(f"`alpha-3` == '{iso_code}'")
         pbar.set_description(f"Processing {iso_code}")
 
-        # Add iso, country, region, and subregion
-        columns = {
-            "source": "UNICEF", 
-            "iso": iso_code,
-            "country": subcode["name"].values[0],
-            "subregion": subcode["sub-region"].values[0], 
-            "region": subcode["region"].values[0]
-        }
-        for key, value in columns.items():
-            subdata[key] = value
-
-        # Append to data
-        columns = [key for key, value in columns.items()] + ['geometry']
+        subdata['source'] = 'UNICEF'
         subdata["geometry"] = gpd.GeoSeries.from_xy(subdata["lon"], subdata["lat"])
-        subdata = subdata[columns]
+        subdata = subdata.drop_duplicates('geometry', keep="first")
+        subdata = _get_iso_regions(subdata, iso_code)
+        subdata = _generate_uid(subdata, category)
+        subdata = subdata[data_config["COLUMNS"] + ["giga_id_school"]]
+        
+        # Append to data
         data.append(subdata)
 
     # Combine dataset
-    data = pd.concat(data).reset_index(drop=True)
-    uids = data.index.to_series().apply(lambda x: f"unicef-{x}")
-    data.insert(loc=0, column='UID', value=uids)
-    data = gpd.GeoDataFrame(data, geometry=data["geometry"], crs="EPSG:4326")
-    print(f"Data dimensions: {data.shape}, CRS: {data.crs}")
-
-    # Save dataset
     out_dir = os.path.dirname(data_dir)
     out_file = os.path.join(out_dir, out_file)
-    data.to_file(out_file, driver="GeoJSON")
-    print(f"Generated {out_file}")
+    data = _concat_data(data, out_file)
     return data
