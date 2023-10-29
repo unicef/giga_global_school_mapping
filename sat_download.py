@@ -18,6 +18,7 @@ def download_images(
     filename, 
     creds, 
     config, 
+    out_dir,
     iso=None, 
     src_crs="EPSG:4326", 
     id_col="UID"
@@ -54,7 +55,7 @@ def download_images(
             format=config['FORMAT']          
         )
         image_name = data[id_col][i]
-        image_name = f"{config['DIR']}{image_name}.tiff"
+        image_name = f"{out_dir}{image_name}.tiff"
         with open(image_name, 'wb') as file:
             file.write(img.read())
 
