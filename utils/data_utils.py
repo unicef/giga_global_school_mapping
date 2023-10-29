@@ -11,12 +11,22 @@ import swifter
 import numpy as np
 import pandas as pd
 import geopandas as gpd
-import config_utils
+
+import folium
+import rasterio as rio
+from rasterio.plot import show
+import matplotlib.pyplot as plt
+from IPython.display import display
 
 from tqdm.notebook import tqdm
 from pyproj import Proj, Transformer
 from scipy.sparse.csgraph import connected_components
 from country_bounding_boxes import country_subunits_by_iso_code
+
+try:
+    import config_utils
+except:
+    from utils import config_utils
 
 pd.options.mode.chained_assignment = None
 
@@ -123,6 +133,66 @@ def _get_geoboundaries(iso_code, out_dir="data/geoboundary", adm_level="ADM0"):
     # Read data using GeoPandas
     geoboundary = gpd.read_file(out_file)
     return geoboundary
+
+
+def map_coords(filename, index, zoom_start=18, max_zoom=20):
+    data = gpd.read_file(filename)
+    coords = data.iloc[index].geometry.y, data.iloc[index].geometry.x
+    map = folium.Map(
+        location=coords, 
+        zoom_start=zoom_start, 
+        max_zoom=max_zoom
+    )
+    folium.TileLayer(
+        tiles='https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+        attr='Google',
+        name='Google Satellite',
+        overlay=True,
+        control=True
+    ).add_to(map)
+    folium.Marker(
+        location=coords, fill_color='#43d9de', radius=8
+    ).add_to(map)
+    display(map)
+
+
+def inspect_images(
+    filename,
+    image_dir,
+    iso,
+    n_rows=8,
+    n_cols=4,
+    index=0,
+    figsize=(15, 35),
+    category="SCHOOL"
+):
+    data = gpd.read_file(filename)
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=figsize)
+    samples = data.iloc[index : index + (n_rows * n_cols)]
+    row_index, col_index = 0, 0
+
+    increment = 1
+    for idx, item in samples.iterrows():
+        class_dir = os.path.join(image_dir, f"{iso}/{category.lower()}")
+        filepath = os.path.join(class_dir, f"{item.UID}.tiff")
+
+        image = rio.open(filepath)
+        show(image, ax=axes[row_index, col_index])
+        axes[row_index, col_index].tick_params(
+            left=False, bottom=False, labelleft=False, labelbottom=False
+        )
+        axes[row_index, col_index].set_axis_off()
+        axes[row_index, col_index].set_title(
+            f"Index: {idx}\n{item.UID}\n{item['name']}", 
+            fontdict={"fontsize": 9}
+        )
+
+        col_index += 1
+        if col_index >= n_cols:
+            row_index += 1
+            col_index = 0  
+        if row_index >= n_rows:
+            break
 
 
 def _connect_components(data, buffer_size, optimize=False):
@@ -291,7 +361,7 @@ def _query_overture(iso_code, out_file, query):
     data_config = _load_data_config()
     url = data_config["OVERTURE_URL"]
     bbox = [c.bbox for c in country_subunits_by_iso_code(iso_code)][0]
-    db.execute(f"""
+    overture_query = f"""
         COPY(
             select
             JSON(names) AS names,
@@ -308,27 +378,44 @@ def _query_overture(iso_code, out_file, query):
             )
         ) TO '{out_file}'
         WITH (FORMAT GDAL, DRIVER 'GeoJSON')
-    """).fetchall()
+    """
+    db.execute(overture_query).fetchall()
 
     # Intersect data with the country's geoboundaries
     data = gpd.read_file(out_file)
     return data
 
 
-def download_overture(iso_codes, out_dir, out_file="overture.geojson", category="SCHOOL"):
+def download_overture(
+    iso_codes, 
+    out_dir, 
+    out_file="overture.geojson", 
+    category="SCHOOL",
+    exclude=None
+):
     """Downloads Overture Map POIs based on a list of ISO codes."""
 
     # Fetch school keywords and generate keywords query
     out_dir = _makedir(out_dir)
     data_config = _load_data_config()
     keywords = data_config[category]
-    query = " or ".join(
-        [
-            f"UPPER(names) LIKE '%{keyword.upper()}%'"
-            for key, values in keywords.items()
+        
+    query = " or ".join([
+        f"""UPPER(names) LIKE '%{keyword.replace('_', ' ').upper()}%'
+        """
+        for key, values in keywords.items()
+        for keyword in values
+    ])
+    
+    if exclude is not None:
+        exclude_keywords = data_config[exclude]
+        exclude_query = " and ".join([
+            f"""UPPER(names) NOT LIKE '%{keyword.replace('_', ' ').upper()}%'
+            """
+            for key, values in exclude_keywords.items()
             for keyword in values
-        ]
-    )
+        ]) 
+        query = f""" ({query}) and ({exclude_query})"""
 
     data = []
     pbar = tqdm(enumerate(iso_codes), total=len(iso_codes))
