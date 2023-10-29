@@ -1,7 +1,6 @@
-DIR: '/home/itingzon.unicef/giga/data/images/'
-SIZE: 76.8
-WIDTH: 256
-HEIGHT: 256
+SIZE: 129.6
+WIDTH: 512
+HEIGHT: 512
 SRS: 'EPSG:3857'
 STYLES: ''
 TRANSPARENT: True

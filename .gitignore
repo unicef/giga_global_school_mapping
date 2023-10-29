@@ -1,0 +1,11 @@
+*.ipynb_checkpoints*
+__pycache__/
+*.py[cod]
+*$py.class
+.github
+*sat_creds*
+wandb/
+data/
+outputs/
+exp/
+*temp*
