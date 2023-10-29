@@ -1,6 +1,7 @@
 ISO_REGIONAL_CODES: "https://raw.githubusercontent.com/lukes/ISO-3166-Countries-with-Regional-Codes/master/all/all.csv"
 OVERTURE_URL: "s3://overturemaps-us-west-2/release/2023-07-26-alpha.0/theme=places/type=*/*"
 GEOBOUNDARIES_URL: "https://www.geoboundaries.org/api/current/gbOpen/"
+COLUMNS: ['UID', 'source', 'iso', 'country', 'region', 'subregion', 'name', 'geometry']
 SCHOOL: {
     amenity: [
         "school",
@@ -47,7 +48,7 @@ NON_SCHOOL: {
         "internet_cafe",
         "marketplace",
         "place_of_mourning",
-        "place_of_worship",
+        "place_of_worship"
     ],
     building: [
         "commercial",
@@ -81,7 +82,7 @@ NON_SCHOOL: {
         "carpenter",
         "electronics_repair",
         "distillery",
-        "oil_mill",
+        "oil_mill"
     ],
     healthcare: [
         "alternative",
@@ -104,6 +105,75 @@ NON_SCHOOL: {
         "cathedral",
         "castle",
         "mosque",
-        "tower",
+        "tower"
+    ],
+    landuse: [
+        "commercial",
+        "retail",
+        "industrial",
+        "warehouse",
+        "cemetery",
+        "religious"
+    ],
+    leisure: [
+        "adult_gaming_centre",
+        "amusement_arcade"
+    ],
+    military: [
+        "barracks",
+        "base",
+        "office"
+    ],
+    place: [
+        "farm",
+        "allotments"
+    ],
+    power: [
+        "transformer"
+    ],
+    public_transport: [
+        "station"
+    ],
+    railway: [
+        "station"
+    ],
+    office: [
+        "government"
+    ],
+    shop: [
+        "alcohol",
+        "bakery",
+        "beverages",
+        "brewing_supplies",
+        "butcher",
+        "cheese",
+        "chocolate",
+        "coffee",
+        "confectionery",
+        "convenience",
+        "farm",
+        "food",
+        "general",
+        "department_store",
+        "kiosk",
+        "mall",
+        "supermarket",
+        "wholesale",
+        "beauty",
+        "fabric",
+        "fashion",
+        "doityourself",
+        "electronics",
+        "garden_centre"
+    ],
+    tourism: [
+        "guest_house",
+        "hostel",
+        "hotel",
+        "motel",
+        "museum",
+        "chalet",
+        "apartment",
+        "zoo"
     ]
 }
