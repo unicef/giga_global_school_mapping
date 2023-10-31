@@ -21,7 +21,8 @@ def download_images(
     out_dir,
     iso=None, 
     src_crs="EPSG:4326", 
-    id_col="UID"
+    id_col="UID",
+    category="SCHOOL"
 ):
     url = f"https://evwhs.digitalglobe.com/mapservice/wmsaccess?connectid={creds['CONNECT_ID']}"
     wms = WebMapService(
@@ -37,28 +38,30 @@ def download_images(
     print(f"Data dimensions: {data.shape}, CRS: {data.crs}")
     
     for i in tqdm(range(len(data))):
-        bbox=(
-            data.lon[i] - config['SIZE'], 
-            data.lat[i] - config['SIZE'], 
-            data.lon[i] + config['SIZE'], 
-            data.lat[i] + config['SIZE'], 
-        )
-        img = wms.getmap(
-            bbox=bbox,
-            layers=config['LAYERS'],
-            srs=config['SRS'],
-            size=(config['WIDTH'], config['HEIGHT']),
-            featureProfile=config['FEATUREPROFILE'],
-            coverage_cql_filter=config['COVERAGE_CQL_FILTER'],
-            exceptions=config['EXCEPTIONS'],
-            transparent=config['TRANSPARENT'],
-            format=config['FORMAT']          
-        )
-        image_name = data[id_col][i]
-        image_name = f"{out_dir}{image_name}.tiff"
-        with open(image_name, 'wb') as file:
-            file.write(img.read())
-
+        out_dir = data_utils._makedir(out_dir)
+        image_file = os.path.join(out_dir, f"{data[id_col][i]}.tiff")
+        
+        if not os.path.exists(image_file):
+            bbox=(
+                data.lon[i] - config['SIZE'], 
+                data.lat[i] - config['SIZE'], 
+                data.lon[i] + config['SIZE'], 
+                data.lat[i] + config['SIZE'], 
+            )
+            img = wms.getmap(
+                bbox=bbox,
+                layers=config['LAYERS'],
+                srs=config['SRS'],
+                size=(config['WIDTH'], config['HEIGHT']),
+                featureProfile=config['FEATUREPROFILE'],
+                coverage_cql_filter=config['COVERAGE_CQL_FILTER'],
+                exceptions=config['EXCEPTIONS'],
+                transparent=config['TRANSPARENT'],
+                format=config['FORMAT']          
+            )
+            with open(image_file, 'wb') as file:
+                file.write(img.read())
+                
 
 def main():
     # Parser
