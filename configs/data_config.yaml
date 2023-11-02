@@ -1,8 +1,14 @@
-ISO_REGIONAL_CODES: "https://raw.githubusercontent.com/lukes/ISO-3166-Countries-with-Regional-Codes/master/all/all.csv"
-OVERTURE_URL: "s3://overturemaps-us-west-2/release/2023-07-26-alpha.0/theme=places/type=*/*"
-GEOBOUNDARIES_URL: "https://www.geoboundaries.org/api/current/gbOpen/"
-COLUMNS: ['UID', 'source', 'iso', 'country', 'region', 'subregion', 'name', 'geometry']
-SCHOOL: {
+data_dir: 'data/vectors/'
+rasters_dir: 'data/rasters/512x512_60cm/'
+columns: ['UID', 'source', 'iso', 'country', 'region', 'subregion', 'name', 'geometry']
+
+# Specify data download URLs
+iso_regional_codes: "https://raw.githubusercontent.com/lukes/ISO-3166-Countries-with-Regional-Codes/master/all/all.csv"
+overture_url: "s3://overturemaps-us-west-2/release/2023-07-26-alpha.0/theme=places/type=*/*"
+geoboundaries_url: "https://www.geoboundaries.org/api/current/gbOpen/"
+
+# Specify school and non-school keywords
+school: {
     amenity: [
         "school",
         "university",
@@ -11,7 +17,7 @@ SCHOOL: {
         "academy"
     ]
 }
-NON_SCHOOL: {
+non_school: {
     amenity: [
         "fast_food",
         "food_court",
