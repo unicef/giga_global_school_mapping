@@ -10,13 +10,22 @@ import geopandas as gpd
 
 from tqdm.notebook import tqdm
 from pyproj import Proj, Transformer
+from scipy.sparse.csgraph import connected_components
 
-try:
-    import config_utils
-except:
-    from utils import config_utils
+try: import config_utils
+except: from utils import config_utils
 
 pd.options.mode.chained_assignment = None
+
+
+def _clean_text(text):
+    """Remove all non-word characters (everything except numbers and letters)"""
+    if text:
+        text = re.sub(r"[^\w\s]", " ", text)
+        text = text.upper()
+    else:
+        text = ""
+    return text
 
 
 def _makedir(out_dir):
@@ -74,7 +83,7 @@ def _convert_to_crs(data, src_crs="EPSG:4326", target_crs="EPSG:3857"):
 
 
 def _concat_data(data, out_file, verbose=True):
-    """Concatenates data and converts to GeoDataFrame"""
+    """Concatenates a list of datasets and converts it to a GeoDataFrame."""
 
     data = pd.concat(data).reset_index(drop=True)
     data = gpd.GeoDataFrame(data, geometry=data["geometry"], crs="EPSG:4326")
@@ -137,3 +146,45 @@ def _get_geoboundaries(iso_code, out_dir="data/geoboundary", adm_level="ADM0"):
     # Read data using GeoPandas
     geoboundary = gpd.read_file(out_file)
     return geoboundary
+
+
+def _read_data(data_dir, out_file=None):
+    """Reads and concatenates data from a directory of files."""
+    
+    data_dir = _makedir(data_dir)
+    files = next(os.walk(data_dir), (None, None, []))[2]
+    files = [file for file in files if file != out_file]
+
+    data = []
+    for file in (pbar := tqdm(files, total=len(files))):
+        pbar.set_description(f"Reading {file}")
+        filename = os.path.join(data_dir, file)
+        subdata = gpd.read_file(filename)
+        data.append(subdata)
+
+    # Concatenate files in data_dir
+    data = gpd.GeoDataFrame(pd.concat(data).copy(), crs="EPSG:4326")
+    return data
+
+
+def _prioritization(data, prioritization=["OVERTURE", "OSM", "UNICEF"]):
+    data["temp_source"] = pd.Categorical(
+        data["source"], categories=prioritization, ordered=True
+    )
+    data = data.sort_values("temp_source", ascending=True).drop_duplicates(["group"])
+    data = data.reset_index(drop=True)
+    return data
+
+
+def _connect_components(data, buffer_size):
+    # Dissolve overlapping geometries
+    # based on: https://gis.stackexchange.com/a/271737
+    
+    temp = data.copy()
+    if data.crs != "EPSG:3857":
+        temp = _convert_to_crs(data, target_crs="EPSG:3857")
+    geometry = temp["geometry"].buffer(buffer_size)
+    overlap_matrix = geometry.apply(lambda x: geometry.overlaps(x)).values.astype(int)
+    n, groups = connected_components(overlap_matrix, directed=False)
+    data["group"] = groups
+    return data
