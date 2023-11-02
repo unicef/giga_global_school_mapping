@@ -13,6 +13,8 @@ from owslib.wms import WebMapService
 from utils import config_utils
 from utils import data_utils
 
+SEED = 42
+
 
 def download_images(
     filename, 
@@ -20,6 +22,7 @@ def download_images(
     config, 
     out_dir,
     iso=None, 
+    sample_size=None,
     src_crs="EPSG:4326", 
     id_col="UID",
     category="SCHOOL"
@@ -35,6 +38,9 @@ def download_images(
     if iso != None: 
         data = data[data['iso'] == iso].reset_index(drop=True)
     data = data_utils._convert_to_crs(data, data.crs, config["SRS"])
+    
+    if sample_size:
+        data = data.iloc[:sample_size]
     print(f"Data dimensions: {data.shape}, CRS: {data.crs}")
     
     for i in tqdm(range(len(data))):
