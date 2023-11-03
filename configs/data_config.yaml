@@ -1,4 +1,4 @@
-data_dir: 'data/vectors/'
+vectors_dir: 'data/vectors/'
 rasters_dir: 'data/rasters/512x512_60cm/'
 columns: ['UID', 'source', 'iso', 'country', 'region', 'subregion', 'name', 'geometry']
 
