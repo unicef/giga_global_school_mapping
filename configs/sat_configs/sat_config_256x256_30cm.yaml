@@ -1,0 +1,13 @@
+SIZE: 38.4
+WIDTH: 256
+HEIGHT: 256
+SRS: 'EPSG:3857'
+STYLES: ''
+TRANSPARENT: True
+REQUEST: 'GetMap'
+FORMAT: 'image/png'
+LAYERS: ['DigitalGlobe:Imagery']
+EXCEPTIONS: 'application/vnd.ogc.se_xml'
+FEATUREPROFILE: 'Most_Aesthetic_Mosaic_Profile'
+COVERAGE_CQL_FILTER: 'productType =%27Pan Sharpened Natural Color%27'
+COVERAGE_CQL_FILTER: ''

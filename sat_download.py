@@ -13,40 +13,54 @@ from owslib.wms import WebMapService
 from utils import config_utils
 from utils import data_utils
 
+SEED = 42
+logging.basicConfig(level=logging.INFO)
+
 
 def download_images(
-    filename, 
     creds, 
     config, 
-    out_dir,
+    category,
     iso=None, 
+    sample_size=None,
     src_crs="EPSG:4326", 
     id_col="UID",
-    category="SCHOOL"
-):
+    name="clean"
+):    
+    data_config = data_utils._load_data_config()
+    cwd = os.path.dirname(os.getcwd())
+    
+    vectors_dir = data_config['data_dir']
+    filename = f"{iso}_{name}.geojson"
+    filename = os.path.join(cwd, vectors_dir, category, name, filename)
+    data = gpd.read_file(filename).reset_index(drop=True)
+    
+    if iso: 
+        data = data[data['iso'] == iso].reset_index(drop=True)
+    if sample_size:
+        data = data.iloc[:sample_size]
+    data = data_utils._convert_to_crs(data, data.crs, config["SRS"])
+    logging.info(f"Data dimensions: {data.shape}, CRS: {data.crs}")
+    
+    rasters_dir = data_config['rasters_dir']
+    out_dir = os.path.join(rasters_dir, iso, category)
+    out_dir = data_utils._makedir(out_dir)
+    
     url = f"https://evwhs.digitalglobe.com/mapservice/wmsaccess?connectid={creds['CONNECT_ID']}"
     wms = WebMapService(
         url, 
         username=creds['USERNAME'],
         password=creds['PASSWORD']
     )
-
-    data = gpd.read_file(filename).reset_index(drop=True)
-    if iso != None: 
-        data = data[data['iso'] == iso].reset_index(drop=True)
-    data = data_utils._convert_to_crs(data, data.crs, config["SRS"])
-    print(f"Data dimensions: {data.shape}, CRS: {data.crs}")
     
-    for i in tqdm(range(len(data))):
-        out_dir = data_utils._makedir(out_dir)
-        image_file = os.path.join(out_dir, f"{data[id_col][i]}.tiff")
-        
+    for index in tqdm(range(len(data))):
+        image_file = os.path.join(out_dir, f"{data[id_col][index]}.tiff")
         if not os.path.exists(image_file):
             bbox=(
-                data.lon[i] - config['SIZE'], 
-                data.lat[i] - config['SIZE'], 
-                data.lon[i] + config['SIZE'], 
-                data.lat[i] + config['SIZE'], 
+                data.lon[index] - config['SIZE'], 
+                data.lat[index] - config['SIZE'], 
+                data.lon[index] + config['SIZE'], 
+                data.lat[index] + config['SIZE'], 
             )
             img = wms.getmap(
                 bbox=bbox,
