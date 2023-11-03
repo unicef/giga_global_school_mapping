@@ -4,7 +4,7 @@ import math
 import random
 import logging
 import argparse
-from tqdm.notebook import tqdm
+from tqdm import tqdm
 
 import pandas as pd
 import geopandas as gpd
@@ -25,14 +25,16 @@ def download_images(
     sample_size=None,
     src_crs="EPSG:4326", 
     id_col="UID",
-    name="clean"
+    name="clean",
+    filename=None
 ):    
     data_config = data_utils._load_data_config()
     cwd = os.path.dirname(os.getcwd())
-    
     vectors_dir = data_config['data_dir']
-    filename = f"{iso}_{name}.geojson"
-    filename = os.path.join(cwd, vectors_dir, category, name, filename)
+    
+    if not filename:
+        filename = f"{iso}_{name}.geojson"
+        filename = os.path.join(cwd, vectors_dir, category, name, filename)
     data = gpd.read_file(filename).reset_index(drop=True)
     
     if iso: 
