@@ -7,6 +7,14 @@ iso_regional_codes: "https://raw.githubusercontent.com/lukes/ISO-3166-Countries-
 overture_url: "s3://overturemaps-us-west-2/release/2023-07-26-alpha.0/theme=places/type=*/*"
 geoboundaries_url: "https://www.geoboundaries.org/api/current/gbOpen/"
 
+# Data cleaning
+priority: ["OVERTURE", "OSM", "UNICEF"]
+buffer_size: 25
+school_buffer_size: 150
+name_match_threshold: 85
+name_match_buffer_size: 250
+ghsl_buffer_size: 150
+
 # Specify school and non-school keywords
 school: {
     amenity: [
