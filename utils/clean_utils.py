@@ -19,108 +19,109 @@ import geemap as emap
 import data_utils
 import networkx as nx
 from rapidfuzz import fuzz
-from tqdm.notebook import tqdm
+from tqdm import tqdm
 
 logging.basicConfig(level=logging.INFO)
 
 
-def _filter_uninhabited_locations(data):
-    ee.Authenticate() 
-    ee.Initialize()
-    
+def _filter_uninhabited_locations(data, buffer_size, pbar=None):
     data = data.reset_index(drop=True)
-    data = data.iloc[:100]
-    print(len(data))
-    pixel_sum = []
-    for index in (pbar := tqdm(range(len(data)), total=len(data))):
-        pbar.set_description(f"Processing index {index}")
+    ghsl_sum = []
+    for index in range(len(data)):
+        if pbar:
+            iso_code = data.iso.values[0]
+            pbar.set_description(f"Processing {iso_code} {index}/{len(data)}")
+
         subdata = data.iloc[[index]]
         subdata = subdata.to_crs("EPSG:3857")
-        subdata['geometry'] = subdata['geometry'].centroid.buffer(500)
+        subdata["geometry"] = subdata["geometry"].centroid.buffer(buffer_size)
         subdata = subdata.to_crs("EPSG:4326")
-        geometry = eec.gdfToFc(subdata) 
-
+        
+        geometry = eec.gdfToFc(subdata[["geometry"]])
         image = ee.Image("JRC/GHSL/P2023A/GHS_BUILT_C/2018")
-        image = image.select('built_characteristics').clip(geometry)
+        image = image.select("built_characteristics").clip(geometry)
         file = image.wx.to_tif(
-            out_dir='./', 
-            description="temp", 
-            region=geometry.geometry(), 
-            scale=10, 
+            out_dir="./",
+            description="temp",
+            region=geometry.geometry(),
+            scale=10,
             crs="EPSG:4326",
-            progress=False
+            progress=False,
         )
 
-        with rio.open(file[0], 'r') as src:
+        with rio.open(file[0], "r") as src:
             image = src.read(1)
             image[image == -32768] = 0
             sum_ = image.sum()
-            pixel_sum.append(sum_)
-            
-    data["pixel_sum"] = pixel_sum
-    data = data[data["pixel_sum"] >= 0]
+            ghsl_sum.append(sum_)
+
+    data["GHSL"] = ghsl_sum
+    data = data[data["GHSL"] > 0]
     data = data.reset_index(drop=True)
     return data
-    
-    
+
+
 def _filter_pois_within_school_vicinity(
-    school_file,
-    buffer_size=150,
-    iso_codes=None,
-    name="filtered"
+    school_file, buffer_size, iso_codes=None, name="filtered"
 ):
     data_config = data_utils._load_data_config()
     cwd = os.path.dirname(os.getcwd())
-    data_dir = data_config['data_dir']
-   
+    data_dir = data_config["vectors_dir"]
+
     school_file = os.path.join(cwd, data_dir, "school", school_file)
     logging.info(f"Reading {school_file}...")
     school = gpd.read_file(school_file)
     logging.info(f"School data dimensions: {school.shape}")
-    
+
     nonschool_dir = os.path.join(data_dir, "non_school")
     exclude = [school_file, f"{name}.geojson"]
     nonschool = data_utils._read_data(nonschool_dir, exclude=exclude)
     logging.info(f"Non-school data dimensions: {nonschool.shape}")
-        
+
     out_dir = os.path.join(data_dir, "non_school", name)
     out_dir = data_utils._makedir(out_dir)
-    
+
     if not iso_codes:
-        iso_codes = school.iso.unique()
-    
+        iso_codes = list(school.iso.value_counts()[::-1].index)
+
     data = []
-    for iso_code in (pbar := tqdm(iso_codes, total=len(iso_codes))):
+    bar_format = "{l_bar}{bar:20}{r_bar}{bar:-20b}"
+    pbar = tqdm(iso_codes, total=len(iso_codes), bar_format=bar_format)
+    for iso_code in pbar:
         pbar.set_description(f"Processing {iso_code}")
         out_subfile = os.path.join(out_dir, f"{iso_code}_{name}.geojson")
-        
+
         if not os.path.exists(out_subfile):
             school_sub = school[school["iso"] == iso_code]
             nonschool_sub = nonschool[nonschool["iso"] == iso_code]
-            
+
             # Convert school and non-school data CRS to EPSG:3857
-            nonschool_temp = data_utils._convert_to_crs(nonschool_sub, target_crs="EPSG:3857")
-            nonschool_temp['index'] = nonschool_sub.index
+            nonschool_temp = data_utils._convert_to_crs(
+                nonschool_sub, target_crs="EPSG:3857"
+            )
+            nonschool_temp["geometry"] = nonschool_temp["geometry"].buffer(buffer_size)
+            nonschool_temp["index"] = nonschool_sub.index
             school_temp = data_utils._convert_to_crs(school_sub, target_crs="EPSG:3857")
-            school_temp['geometry'] = school_temp["geometry"].buffer(buffer_size)
-            
+            school_temp["geometry"] = school_temp["geometry"].buffer(buffer_size)
+
             # Filter out non-school POIs that intersect with buffered school locations
-            intersecting = school_temp.sjoin(nonschool_temp, how='inner')['index']
-            nonschool_sub = nonschool_sub[~nonschool_temp['index'].isin(intersecting)]
-            
+            intersecting = school_temp.sjoin(nonschool_temp, how="inner")["index"]
+            nonschool_sub = nonschool_sub[~nonschool_temp["index"].isin(intersecting)]
+
             # Save country-level dataset
             columns = data_config["columns"]
             nonschool_sub = nonschool_sub[columns]
             nonschool_sub.to_file(out_subfile, driver="GeoJSON")
-            
+
         subdata = gpd.read_file(out_subfile).reset_index(drop=True)
         data.append(subdata)
-    
+
     # Combine datasets
     filtered_file = os.path.join(cwd, nonschool_dir, f"{name}.geojson")
-    data = data_utils._concat_data(data, filtered_file)
+    data = data_utils._concat_data(data)
+    data.to_file(filtered_file, driver="GeoJSON")
     return data
-    
+
 
 def _filter_pois_with_matching_names(data, priority, threshold, buffer_size):
     # Get connected components within a given buffer size and get groups with size > 1
@@ -139,16 +140,11 @@ def _filter_pois_with_matching_names(data, priority, threshold, buffer_size):
         uid_edge_list = []
         for comb in combs:
             score = fuzz.partial_ratio(
-                data_utils._clean_text(comb[0][1]), 
-                data_utils._clean_text(comb[1][1])
+                data_utils._clean_text(comb[0][1]), data_utils._clean_text(comb[1][1])
             )
-            uid_edge_list.append((
-                comb[0][0], 
-                comb[0][1], 
-                comb[1][0], 
-                comb[1][1], 
-                score
-            ))
+            uid_edge_list.append(
+                (comb[0][0], comb[0][1], comb[1][0], comb[1][1], score)
+            )
         columns = ["source", "name_1", "target", "name_2", "score"]
         uid_edge_list = pd.DataFrame(uid_edge_list, columns=columns)
         uid_network.append(uid_edge_list)
@@ -161,7 +157,7 @@ def _filter_pois_with_matching_names(data, priority, threshold, buffer_size):
         graph = nx.from_pandas_edgelist(uid_network[columns])
         connected_components = nx.connected_components(graph)
         groups = {
-            num : index
+            num: index
             for index, group in enumerate(connected_components, start=1)
             for num in group
         }
@@ -171,7 +167,7 @@ def _filter_pois_with_matching_names(data, priority, threshold, buffer_size):
             for uid, value in groups.items():
                 data.loc[data["UID"] == uid, "group"] = value
             max_group = int(data["group"].max()) + 1
-            fillna = list(range(max_group, len(data)+max_group))
+            fillna = list(range(max_group, len(data) + max_group))
             data["group"] = data.apply(
                 lambda x: x["group"]
                 if not np.isnan(x["group"])
@@ -179,37 +175,47 @@ def _filter_pois_with_matching_names(data, priority, threshold, buffer_size):
                 axis=1,
             )
             data = data_utils._drop_duplicates(data, priority)
-            
+
     return data
 
 
 def filter_pois(
     category,
-    iso_codes=None,
     buffer_size=25,
     school_file=None,
     school_buffer_size=150,
     name_match_threshold=85,
-    name_match_buffer_size=150,
+    name_match_buffer_size=250,
+    ghsl_buffer_size=150,
     priority=["OVERTURE", "OSM", "UNICEF"],
-    name="clean"
+    name="clean",
+    iso_codes=None,
+    gee=False
 ):
+    if gee:
+        ee.Authenticate()
+        ee.Initialize()
+
     data_config = data_utils._load_data_config()
-    data_dir = os.path.join(data_config['data_dir'], category)
-    out_dir = os.path.join(data_config['data_dir'], category, name)
+    data_dir = os.path.join(data_config["vectors_dir"], category)
+    out_dir = os.path.join(data_config["vectors_dir"], category, name)
     out_dir = data_utils._makedir(out_dir)
-    
+
     if category == "non_school":
-        data = _filter_pois_within_school_vicinity(school_file, school_buffer_size, iso_codes)
+        data = _filter_pois_within_school_vicinity(
+            school_file, school_buffer_size, iso_codes
+        )
     else:
         data = data_utils._read_data(data_dir, exclude=[f"{name}.geojson"])
     data = data.drop_duplicates("geometry", keep="first")
-    
+
     if not iso_codes:
-        iso_codes = data.iso.unique()
+        iso_codes = list(data.iso.value_counts()[::-1].index)
 
     out_data = []
-    for iso_code in (pbar := tqdm(iso_codes, total=len(iso_codes))):
+    bar_format = "{l_bar}{bar:20}{r_bar}{bar:-20b}"
+    pbar = tqdm(iso_codes, total=len(iso_codes), bar_format=bar_format)
+    for iso_code in pbar:
         pbar.set_description(f"Processing {iso_code}")
         out_subfile = os.path.join(out_dir, f"{iso_code}_{name}.geojson")
 
@@ -236,7 +242,7 @@ def filter_pois(
                     if "giga_id_school" in subsubdata.columns:
                         columns = columns + ["giga_id_school"]
                     subsubdata = subsubdata[columns]
-                    
+
                     subsubdata = _filter_pois_with_matching_names(
                         subsubdata,
                         priority,
@@ -246,9 +252,12 @@ def filter_pois(
                     out_subdata.append(subsubdata)
 
             # Save cleaned file
-            out_subdata = data_utils._concat_data(
-                out_subdata, out_subfile, verbose=False
-            )
+            out_subdata = data_utils._concat_data(out_subdata, verbose=False)
+            if "GHSL" not in out_subdata.columns:
+                out_subdata = _filter_uninhabited_locations(
+                    out_subdata, ghsl_buffer_size, pbar
+                )
+            out_subdata.to_file(out_subfile, driver="GeoJSON")
 
         out_subdata = gpd.read_file(out_subfile).reset_index(drop=True)
         out_data.append(out_subdata)
@@ -256,4 +265,6 @@ def filter_pois(
     # Save combined dataset
     out_file = os.path.join(os.path.dirname(out_dir), f"{name}.geojson")
     data = data_utils._concat_data(out_data, out_file)
+    data.to_file(out_file, driver="GeoJSON")
+
     return data
