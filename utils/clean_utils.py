@@ -8,21 +8,19 @@ import numpy as np
 import pandas as pd
 import geopandas as gpd
 
+import ee
+import eeconvert as eec
+
 import wxee
 import xarray as xr
 import rasterio as rio
 
-import ee
-import eeconvert as eec
-import geemap as emap
-
-import data_utils
 import networkx as nx
 from rapidfuzz import fuzz
 from tqdm import tqdm
+import data_utils
 
 logging.basicConfig(level=logging.INFO)
-
 
 def _filter_uninhabited_locations(data, buffer_size, pbar=None):
     data = data.reset_index(drop=True)
@@ -62,32 +60,47 @@ def _filter_uninhabited_locations(data, buffer_size, pbar=None):
 
 
 def _filter_pois_within_school_vicinity(
-    school_file, buffer_size, iso_codes=None, name="filtered"
+    config, 
+    buffer_size, 
+    iso_codes=None, 
+    sname="clean", 
+    name="filtered"
 ):
-    data_config = data_utils._load_data_config()
     cwd = os.path.dirname(os.getcwd())
-    data_dir = data_config["vectors_dir"]
-
-    school_file = os.path.join(cwd, data_dir, "school", school_file)
-    logging.info(f"Reading {school_file}...")
-    school = gpd.read_file(school_file)
-    logging.info(f"School data dimensions: {school.shape}")
-
-    nonschool_dir = os.path.join(data_dir, "non_school")
-    exclude = [school_file, f"{name}.geojson"]
-    nonschool = data_utils._read_data(nonschool_dir, exclude=exclude)
-    logging.info(f"Non-school data dimensions: {nonschool.shape}")
-
+    data_dir = config["vectors_dir"]
     out_dir = os.path.join(data_dir, "non_school", name)
     out_dir = data_utils._makedir(out_dir)
 
+    #school_file = os.path.join(cwd, data_dir, "school", f"{sname}.geojson")
+    #school = gpd.read_file(school_file)
+    #logging.info(f"School data dimensions: {school.shape}")
+
+    nonschool_dir = os.path.join(data_dir, "non_school")
+    exclude = [f"{sname}.geojson", f"{name}.geojson"]
+    nonschool = data_utils._read_data(nonschool_dir, exclude=exclude)
+    logging.info(f"Non-school data dimensions: {nonschool.shape}")
+
     if not iso_codes:
-        iso_codes = list(school.iso.value_counts()[::-1].index)
+        iso_codes = list(nonschool.iso.value_counts()[::-1].index)
 
     data = []
     bar_format = "{l_bar}{bar:20}{r_bar}{bar:-20b}"
     pbar = tqdm(iso_codes, total=len(iso_codes), bar_format=bar_format)
     for iso_code in pbar:
+        ########################################################
+        # TODO: Put this back at the top and remove sname folder 
+        #school_file = os.path.join(
+        #    cwd, 
+        #    data_dir, 
+        #    "school", 
+        #    sname, 
+        #    f"{iso_code}_{sname}.geojson"
+        #)
+        #if not os.path.exists(school_file):
+        #    continue
+        #school = gpd.read_file(school_file)
+        ##########################################################
+        
         pbar.set_description(f"Processing {iso_code}")
         out_subfile = os.path.join(out_dir, f"{iso_code}_{name}.geojson")
 
@@ -109,7 +122,7 @@ def _filter_pois_within_school_vicinity(
             nonschool_sub = nonschool_sub[~nonschool_temp["index"].isin(intersecting)]
 
             # Save country-level dataset
-            columns = data_config["columns"]
+            columns = config["columns"]
             nonschool_sub = nonschool_sub[columns]
             nonschool_sub.to_file(out_subfile, driver="GeoJSON")
 
@@ -179,34 +192,32 @@ def _filter_pois_with_matching_names(data, priority, threshold, buffer_size):
     return data
 
 
-def filter_pois(
+def clean_data(
+    config,
     category,
-    buffer_size=25,
-    school_file=None,
-    school_buffer_size=150,
-    name_match_threshold=85,
-    name_match_buffer_size=250,
-    ghsl_buffer_size=150,
-    priority=["OVERTURE", "OSM", "UNICEF"],
-    name="clean",
     iso_codes=None,
-    gee=False
+    name="clean",
+    gee=True
 ):
     if gee:
         ee.Authenticate()
         ee.Initialize()
 
-    data_config = data_utils._load_data_config()
-    data_dir = os.path.join(data_config["vectors_dir"], category)
-    out_dir = os.path.join(data_config["vectors_dir"], category, name)
+    data_dir = os.path.join(config["vectors_dir"], category)
+    out_dir = os.path.join(config["vectors_dir"], category, name)
     out_dir = data_utils._makedir(out_dir)
 
     if category == "non_school":
         data = _filter_pois_within_school_vicinity(
-            school_file, school_buffer_size, iso_codes
+            config, 
+            buffer_size=config['school_buffer_size'], 
+            iso_codes=iso_codes,
         )
     else:
-        data = data_utils._read_data(data_dir, exclude=[f"{name}.geojson"])
+        data = data_utils._read_data(
+            data_dir, 
+            exclude=[f"{name}.geojson"]
+        )
     data = data.drop_duplicates("geometry", keep="first")
 
     if not iso_codes:
@@ -221,7 +232,7 @@ def filter_pois(
 
         if not os.path.exists(out_subfile):
             subdata = data[data["iso"] == iso_code].reset_index(drop=True)
-            geoboundaries = data_utils._get_geoboundaries(iso_code, adm_level="ADM1")
+            geoboundaries = data_utils._get_geoboundaries(config, iso_code, adm_level="ADM1")
             geoboundaries = geoboundaries[["shapeName", "geometry"]]
             geoboundaries = geoboundaries.dropna(subset=["shapeName"])
             subdata = subdata.sjoin(geoboundaries, how="left", predicate="within")
@@ -235,9 +246,9 @@ def filter_pois(
                 subsubdata = subsubdata.reset_index(drop=True)
 
                 if len(subsubdata) > 0:
-                    columns = data_config["columns"]
-                    subsubdata = data_utils._connect_components(subsubdata, buffer_size)
-                    subsubdata = data_utils._drop_duplicates(subsubdata, priority)
+                    columns = config["columns"]
+                    subsubdata = data_utils._connect_components(subsubdata, config['buffer_size'])
+                    subsubdata = data_utils._drop_duplicates(subsubdata, config['priority'])
 
                     if "giga_id_school" in subsubdata.columns:
                         columns = columns + ["giga_id_school"]
@@ -245,20 +256,19 @@ def filter_pois(
 
                     subsubdata = _filter_pois_with_matching_names(
                         subsubdata,
-                        priority,
-                        name_match_threshold,
-                        name_match_buffer_size,
+                        priority=config['priority'],
+                        threshold=config['name_match_threshold'],
+                        buffer_size=config['name_match_buffer_size'],
                     )[columns]
                     out_subdata.append(subsubdata)
 
             # Save cleaned file
             out_subdata = data_utils._concat_data(out_subdata, verbose=False)
-            if "GHSL" not in out_subdata.columns:
+            if (category == "school") and ("GHSL" not in out_subdata.columns):
                 out_subdata = _filter_uninhabited_locations(
-                    out_subdata, ghsl_buffer_size, pbar
+                    out_subdata, config['ghsl_buffer_size'], pbar=pbar
                 )
             out_subdata.to_file(out_subfile, driver="GeoJSON")
-
         out_subdata = gpd.read_file(out_subfile).reset_index(drop=True)
         out_data.append(out_subdata)
 
