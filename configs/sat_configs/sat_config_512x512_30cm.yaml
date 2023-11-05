@@ -1,6 +1,10 @@
-SIZE: 76.8
-WIDTH: 512
-HEIGHT: 512
+DIGITALGLOBE_URL: "https://evwhs.digitalglobe.com/mapservice/wmsaccess?"
+RASTERS_DIR: 'data/rasters/'
+VECTORS_DIR: 'data/vectors/'
+DIR: '512x512_30cm'
+SIZE: 153.6
+WIDTH: 1024
+HEIGHT: 1024
 SRS: 'EPSG:3857'
 STYLES: ''
 TRANSPARENT: True
