@@ -117,7 +117,7 @@ def _get_geoboundaries(config, iso_code, out_dir=None, adm_level="ADM0"):
     # Query geoBoundaries
     if not out_dir:
         cwd = os.path.dirname(os.getcwd())
-        out_dir = os.path.join(cwd, config['rasters_dir'], "geoboundaries")
+        out_dir = os.path.join(cwd, config['vectors_dir'], "geoboundaries")
     if not os.path.exists(out_dir):
         out_dir = _makedir(out_dir)
         
