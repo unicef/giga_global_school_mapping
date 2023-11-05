@@ -28,9 +28,8 @@ def download_images(
     name="clean",
     filename=None
 ):    
-    data_config = data_utils._load_data_config()
     cwd = os.path.dirname(os.getcwd())
-    vectors_dir = data_config['data_dir']
+    vectors_dir = config['VECTORS_DIR']
     
     if not filename:
         filename = f"{iso}_{name}.geojson"
@@ -44,11 +43,16 @@ def download_images(
     data = data_utils._convert_to_crs(data, data.crs, config["SRS"])
     logging.info(f"Data dimensions: {data.shape}, CRS: {data.crs}")
     
-    rasters_dir = data_config['rasters_dir']
-    out_dir = os.path.join(rasters_dir, iso, category)
+    out_dir = os.path.join(
+        cwd,
+        config['RASTERS_DIR'],
+        config["DIR"], 
+        iso, 
+        category
+    )
     out_dir = data_utils._makedir(out_dir)
     
-    url = f"https://evwhs.digitalglobe.com/mapservice/wmsaccess?connectid={creds['CONNECT_ID']}"
+    url = f"{config['DIGITALGLOBE_URL']}connectid={creds['CONNECT_ID']}"
     wms = WebMapService(
         url, 
         username=creds['USERNAME'],
@@ -56,7 +60,8 @@ def download_images(
     )
     
     for index in tqdm(range(len(data))):
-        image_file = os.path.join(out_dir, f"{data[id_col][index]}.tiff")
+        image_file = os.path.join(
+            out_dir, f"{data[id_col][index]}.tiff")
         if not os.path.exists(image_file):
             bbox=(
                 data.lon[index] - config['SIZE'], 
