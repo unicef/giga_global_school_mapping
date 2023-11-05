@@ -1,5 +1,5 @@
 vectors_dir: 'data/vectors/'
-rasters_dir: 'data/rasters/512x512_60cm/'
+rasters_dir: 'data/rasters/'
 columns: ['UID', 'source', 'iso', 'country', 'region', 'subregion', 'name', 'geometry']
 
 # Specify data download URLs
