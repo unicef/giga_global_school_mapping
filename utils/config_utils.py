@@ -26,6 +26,4 @@ def create_config(config_file, prefix=""):
         if "DIR" in k:
             if len(prefix) > 0:
                 cfg[k] = prefix + cfg[k]
-            if not os.path.exists(cfg[k]):
-                os.makedirs(cfg[k])
     return cfg
