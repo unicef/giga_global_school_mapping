@@ -1,6 +1,7 @@
 vectors_dir: 'data/vectors/'
 rasters_dir: 'data/rasters/'
-columns: ['UID', 'source', 'iso', 'country', 'region', 'subregion', 'name', 'geometry']
+columns: ['UID', 'source', 'iso', 'country', 'region', 'subregion', 'name', 'geometry', 'giga_id_school']
+iso_codes: ['LCA', 'BWA', 'MSR', 'AIA', 'VGB', 'KNA', 'ATG', 'DMA', 'VCT', 'BRB', 'KIR', 'GRD', 'BLZ', 'TTO', 'MNG', 'GIN', 'BIH', 'NAM', 'CRI', 'HUN', 'PAN', 'RWA', 'SLV', 'SSD', 'KEN', 'KAZ', 'MWI', 'BEN', 'UKR', 'ZWE', 'SLE', 'UZB', 'SEN', 'YEM', 'GHA', 'HND', 'NER', 'THA', 'ZAF', 'NGA', 'BRA']
 
 # Specify data download URLs
 iso_regional_codes: "https://raw.githubusercontent.com/lukes/ISO-3166-Countries-with-Regional-Codes/master/all/all.csv"
@@ -8,12 +9,12 @@ overture_url: "s3://overturemaps-us-west-2/release/2023-07-26-alpha.0/theme=plac
 geoboundaries_url: "https://www.geoboundaries.org/api/current/gbOpen/"
 
 # Data cleaning
-priority: ["OVERTURE", "OSM", "UNICEF"]
 buffer_size: 25
 school_buffer_size: 150
 name_match_threshold: 85
 name_match_buffer_size: 250
 ghsl_buffer_size: 150
+priority: ["OVERTURE", "OSM", "UNICEF"]
 
 # Specify school and non-school keywords
 school: {
@@ -191,3 +192,18 @@ non_school: {
         "zoo"
     ]
 }
+
+exclude: 
+- "Preschool"
+- "Pre-school"
+- "Daycare"
+- "Taekwando"
+- "Swim"
+- "Driving"
+- "Flight"
+- "K9"
+- "Dog"
+- "Ballet"
+- "Sunday School"
+- "Quick Minds"
+- "Dance"
