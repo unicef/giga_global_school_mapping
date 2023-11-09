@@ -58,8 +58,8 @@ def _filter_pois_within_distance(data, buffer_size, priority):
 
 
 def _filter_keywords(data, exclude):
-    exclude =  [x.upper() for x in exclude]
-    data = data[~data["name"].str.upper().str.contains('|'.join(exclude), na=False)]
+    exclude =  [f"\\b{x.upper()}\\b" for x in exclude]
+    data = data[~data["name"].str.upper().str.contains(r'|'.join(exclude), case=False, na=False)]
     return data
 
 
@@ -77,11 +77,17 @@ def _filter_uninhabited_locations(config, data, buffer_size, layer="ghsl", pbar=
         
         subdata = data.iloc[[index]]
         subdata = subdata.to_crs("EPSG:3857")
-        subdata["geometry"] = subdata["geometry"].centroid.buffer(buffer_size)
-        subdata = subdata.to_crs("EPSG:4326")
+        subdata["geometry"] = subdata["geometry"].centroid.buffer(buffer_size, cap_style=3)
 
-        ghsl_path = os.path.join(cwd, rasters_dir, layer, f"{iso_code}_{layer}.tif")
+        ghsl_file = "GHS_BUILT_C_FUN_E2018_GLOBE_R2023A_54009_10_V1_0.tif"
+        ghsl_path = os.path.join(cwd, rasters_dir, layer, "global", ghsl_file)
         if os.path.exists(ghsl_path):
+            subdata = subdata.to_crs("ESRI:54009")
+        else:
+            ghsl_path = os.path.join(cwd, rasters_dir, layer, f"{iso_code}_{layer}.tif")
+            subdata = subdata.to_crs("EPSG:4326")
+        
+        if os.path.exists(ghsl_path):  
             with rio.open(ghsl_path) as src:
                 geometry = [subdata.iloc[0]['geometry']]
                 image, _ = rio.mask.mask(src, geometry, crop=True)
@@ -245,7 +251,13 @@ def clean_data(config, category, iso_codes=None, name="clean", gee=False):
                 subsubdata = subsubdata.reset_index(drop=True)
                 columns = config["columns"]
 
-                if len(subsubdata) > 0:                    
+                if len(subsubdata) > 0:
+                    # Remove schools containing certain keywords
+                    if category == "school":
+                        subsubdata = _filter_keywords(
+                            subsubdata, exclude=config["exclude"]
+                        )[columns]
+                    
                     # Remove schools within 50 meters of each other
                     subsubdata = _filter_pois_within_distance(
                         subsubdata, 
@@ -260,6 +272,14 @@ def clean_data(config, category, iso_codes=None, name="clean", gee=False):
                         threshold=config["name_match_threshold"],
                         buffer_size=config["name_match_buffer_size"]
                     )[columns]
+
+                    # Filter uninhabited locations
+                    subsubdata = _filter_uninhabited_locations(
+                        config,
+                        subsubdata,
+                        buffer_size=config["ghsl_buffer_size"], 
+                        pbar=pbar
+                    )
                     out_subdata.append(subsubdata)
 
             # Save cleaned file
@@ -267,16 +287,6 @@ def clean_data(config, category, iso_codes=None, name="clean", gee=False):
             out_subdata.to_file(out_subfile, driver="GeoJSON")
             
         out_subdata = gpd.read_file(out_subfile).reset_index(drop=True)
-        # Remove uninhabited school data points
-        if ('ghsl' not in out_subdata.columns):
-            out_subdata = _filter_uninhabited_locations(
-                config,
-                out_subdata,
-                buffer_size=config["ghsl_buffer_size"], 
-                pbar=pbar
-            )
-        # Remove schools containing certain keywords
-        out_subdata = _filter_keywords(out_subdata, exclude=config["exclude"])
         out_subdata.to_file(out_subfile, driver="GeoJSON")
         out_data.append(out_subdata)
 
