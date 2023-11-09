@@ -1,18 +1,24 @@
 vectors_dir: 'data/vectors/'
 rasters_dir: 'data/rasters/'
 columns: ['UID', 'source', 'iso', 'country', 'region', 'subregion', 'name', 'geometry', 'giga_id_school']
-iso_codes: ['LCA', 'BWA', 'MSR', 'AIA', 'VGB', 'KNA', 'ATG', 'DMA', 'VCT', 'BRB', 'KIR', 'GRD', 'BLZ', 'TTO', 'MNG', 'GIN', 'BIH', 'NAM', 'CRI', 'HUN', 'PAN', 'RWA', 'SLV', 'SSD', 'KEN', 'KAZ', 'MWI', 'BEN', 'UKR', 'ZWE', 'SLE', 'UZB', 'SEN', 'YEM', 'GHA', 'HND', 'NER', 'THA', 'ZAF', 'NGA', 'BRA']
+iso_codes: [
+    'AIA', 'ATG', 'BEN', 'BIH', 'BLZ', 'BRA', 'BRB', 'BWA', 'CRI', 'DMA', 
+    'GHA', 'GIN', 'GRD', 'HND', 'HUN', 'KAZ', 'KEN', 'KIR', 'KNA', 'LCA', 
+    'MNG', 'MSR', 'MWI', 'NAM', 'NER', 'NGA', 'PAN', 'RWA', 'SEN', 'SLE', 
+    'SLV', 'SSD', 'THA', 'TTO', 'UKR', 'UZB', 'VCT', 'VGB', 'YEM', 'ZAF', 'ZWE'
+]
 
 # Specify data download URLs
 iso_regional_codes: "https://raw.githubusercontent.com/lukes/ISO-3166-Countries-with-Regional-Codes/master/all/all.csv"
 overture_url: "s3://overturemaps-us-west-2/release/2023-07-26-alpha.0/theme=places/type=*/*"
 geoboundaries_url: "https://www.geoboundaries.org/api/current/gbOpen/"
+ghsl_url: "https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/GHSL/GHS_BUILT_C_GLOBE_R2023A/GHS_BUILT_C_FUN_E2018_GLOBE_R2023A_54009_10/V1-0/GHS_BUILT_C_FUN_E2018_GLOBE_R2023A_54009_10_V1_0.zip"
 
 # Data cleaning
 buffer_size: 25
 school_buffer_size: 150
 name_match_threshold: 85
-name_match_buffer_size: 250
+name_match_buffer_size: 150
 ghsl_buffer_size: 150
 priority: ["OVERTURE", "OSM", "UNICEF"]
 
@@ -194,8 +200,6 @@ non_school: {
 }
 
 exclude: 
-- "Preschool"
-- "Pre-school"
 - "Daycare"
 - "Taekwando"
 - "Swim"
@@ -207,3 +211,11 @@ exclude:
 - "Sunday School"
 - "Quick Minds"
 - "Dance"
+- "Soccer"
+- "Bikeride"
+- "Basketball"
+- "Beauty"
+- "Cosmetics"
+- "Makeup"
+- "Salon"
+- "Art"
