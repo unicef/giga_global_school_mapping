@@ -11,20 +11,17 @@ import geopandas as gpd
 
 from tqdm import tqdm
 from pyproj import Proj, Transformer
-from scipy.sparse.csgraph import connected_components
 
 pd.options.mode.chained_assignment = None
 logging.basicConfig(level=logging.INFO)
 
 
-def _clean_text(text):
-    """Remove all non-word characters (everything except numbers and letters)"""
-    if text:
-        text = re.sub(r"[^\w\s]", " ", text)
-        text = text.upper()
-    else:
-        text = ""
-    return text
+def _create_progress_bar(items):
+    """Create progress bar from items"""
+    
+    bar_format = "{l_bar}{bar:20}{r_bar}{bar:-20b}"
+    pbar = tqdm(items, total=len(items), bar_format=bar_format)
+    return pbar
 
 
 def _makedir(out_dir):
@@ -74,14 +71,15 @@ def _concat_data(data, out_file=None, verbose=True):
 
     data = pd.concat(data).reset_index(drop=True)
     data = gpd.GeoDataFrame(data, geometry=data["geometry"], crs="EPSG:4326")
-    
+    data = data.drop_duplicates("geometry", keep="first")
+
     if out_file:
         data.to_file(out_file, driver="GeoJSON")
         logging.info(f"Generated {out_file}")
-    
+
     if verbose:
         logging.info(f"Data dimensions: {data.shape}, CRS: {data.crs}")
-    
+
     return data
 
 
@@ -101,11 +99,15 @@ def _prepare_data(config, data, iso_code, category, source, columns, out_file=No
 
     if "name" not in data.columns:
         data["name"] = None
+    if "giga_id_school" not in data.columns:
+        data["giga_id_school"] = None
+        
     data["source"] = source.upper()
     data = data.drop_duplicates("geometry", keep="first")
     data = _get_iso_regions(config, data, iso_code)
     data = _generate_uid(data, category)
     data = data[columns]
+    
     if out_file:
         data.to_file(out_file, driver="GeoJSON")
     return data
@@ -117,10 +119,10 @@ def _get_geoboundaries(config, iso_code, out_dir=None, adm_level="ADM0"):
     # Query geoBoundaries
     if not out_dir:
         cwd = os.path.dirname(os.getcwd())
-        out_dir = os.path.join(cwd, config['vectors_dir'], "geoboundaries")
+        out_dir = os.path.join(cwd, config["vectors_dir"], "geoboundaries")
     if not os.path.exists(out_dir):
         out_dir = _makedir(out_dir)
-        
+
     try:
         url = f"{config['geoboundaries_url']}{iso_code}/{adm_level}/"
         r = requests.get(url)
@@ -160,26 +162,6 @@ def _read_data(data_dir, exclude=[]):
 
     # Concatenate files in data_dir
     data = gpd.GeoDataFrame(pd.concat(data).copy(), crs="EPSG:4326")
+    data = data.drop_duplicates("geometry", keep="first")
     return data
 
-
-def _drop_duplicates(data, priority):
-    data["temp_source"] = pd.Categorical(
-        data["source"], categories=priority, ordered=True
-    )
-    data = data.sort_values("temp_source", ascending=True).drop_duplicates(["group"])
-    data = data.reset_index(drop=True)
-    return data
-
-
-def _connect_components(data, buffer_size):
-    # Dissolve overlapping geometries based on: https://gis.stackexchange.com/a/271737
-
-    temp = data.copy()
-    if data.crs != "EPSG:3857":
-        temp = _convert_to_crs(data, target_crs="EPSG:3857")
-    geometry = temp["geometry"].buffer(buffer_size)
-    overlap_matrix = geometry.apply(lambda x: geometry.overlaps(x)).values.astype(int)
-    n, groups = connected_components(overlap_matrix, directed=False)
-    data["group"] = groups
-    return data
