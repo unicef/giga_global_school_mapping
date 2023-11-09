@@ -13,7 +13,6 @@ def _initialize_gee():
 
 def generate_gee_images(config, folder, iso_codes=None, layer="ghsl"):
     if not iso_codes: iso_codes = config["iso_codes"]
-
     for iso_code in (pbar := data_utils._create_progress_bar(iso_codes)):
         pbar.set_description(f"Processing {iso_code}")
         geoboundary = data_utils._get_geoboundaries(config, iso_code)
