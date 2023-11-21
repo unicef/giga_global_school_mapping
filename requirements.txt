@@ -1,10 +1,9 @@
 country_bounding_boxes==0.2.3
-duckdb==0.9.1
 earthengine_api==0.1.377
 easydict==1.11
 eeconvert==0.1.22
 folium==0.14.0
-geojson==3.0.1
+geojson==3.1.0
 geopandas==0.14.0
 ipython==8.17.2
 matplotlib==3.8.1
