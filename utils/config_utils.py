@@ -11,11 +11,11 @@ def create_config(config_file, prefix=""):
     """Loads YAML config file as dictionary.
 
     Args:
-        config_file_exp (str): Path to config file.
-        prefix (str): Config file prefix.
+    - config_file_exp (str): Path to config file.
+    - prefix (str): Config file prefix.
 
     Returns:
-        dict: The config as a dictionary.
+    - dict: The config as a dictionary.
     """
     with open(config_file, "r") as stream:
         config = yaml.safe_load(stream)
