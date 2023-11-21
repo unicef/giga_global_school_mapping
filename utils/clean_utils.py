@@ -118,7 +118,7 @@ def _filter_keywords(data, exclude, column="name"):
 
     exclude = [f"\\b{x.upper()}\\b" for x in exclude]
     data = data[
-        ~data[columns]
+        ~data[column]
         .str.upper()
         .str.contains(r"|".join(exclude), case=False, na=False)
     ]
@@ -141,14 +141,14 @@ def generate_ghsl_per_country(config, layer="ghsl", exclude=[]):
     cwd = os.path.dirname(os.getcwd())
     iso_codes = list(set(config["iso_codes"]) - set(exclude))
 
-    for iso_code in (pbar := _create_progress_bar(iso_codes)):
+    for iso_code in (pbar := data_utils._create_progress_bar(iso_codes)):
         rasters_dir = config["rasters_dir"]
         ghsl_path = os.path.join(cwd, rasters_dir, layer, config["ghsl_file"])
         out_tif = os.path.join(cwd, rasters_dir, layer, f"{iso_code}_{layer}.tif")
         pbar.set_description(f"Processing {iso_code}")
 
         if not os.path.exists(out_tif):
-            geoboundary = _get_geoboundaries(config, iso_code, adm_level="ADM0")
+            geoboundary = data_utils._get_geoboundaries(config, iso_code, adm_level="ADM0")
             geoboundary = geoboundary.to_crs("ESRI:54009")
 
             with rio.open(ghsl_path) as src:
@@ -203,17 +203,15 @@ def _filter_uninhabited_locations(config, data, buffer_size, layer="ghsl", pbar=
         )
 
         ghsl_path = os.path.join(cwd, rasters_dir, layer, f"{iso_code}_{layer}.tif")
-        if os.path.exists(ghsl_path):
-            subdata = subdata.to_crs("EPSG:4326")
-        else:
+        if not os.path.exists(ghsl_path):
             ghsl_path = os.path.join(cwd, rasters_dir, layer, config["ghsl_file"])
-            if os.path.exists(ghsl_path):
-                subdata = subdata.to_crs("ESRI:54009")
-
-        print(subdata.crs)
 
         if os.path.exists(ghsl_path):
             with rio.open(ghsl_path) as src:
+                if src.crs != "EPSG:4326":
+                    subdata = subdata.to_crs("ESRI:54009")
+                else:
+                    subdata = subdata.to_crs(src.crs)
                 geometry = [subdata.iloc[0]["geometry"]]
                 image, transform = rio.mask.mask(src, geometry, crop=True)
         else:
@@ -250,30 +248,32 @@ def _filter_pois_within_school_vicinity(
     Returns:
     - GeoDataFrame: Processed and filtered GeoDataFrame containing non-school POIs.
     """
-
+    # Get the current working directory
     cwd = os.path.dirname(os.getcwd())
-    data_dir = config["vectors_dir"]
 
+    # Set up directories and configurations
+    data_dir = config["vectors_dir"]
     out_dir = os.path.join(data_dir, "non_school", name)
     out_dir = data_utils._makedir(out_dir)
     iso_codes = config["iso_codes"]
 
+    # Read non-school dataset
     nonschool_dir = os.path.join(data_dir, "non_school")
     exclude = [f"{sname}.geojson", f"{name}.geojson"]
     nonschool = data_utils._read_data(nonschool_dir, exclude=exclude)
 
     data = []
+    # Iterate over ISO codes to process data
     for iso_code in (pbar := data_utils._create_progress_bar(iso_codes)):
         filename = f"{iso_code}_{sname}.geojson"
-        school_file_ = os.path.join(cwd, data_dir, "school", sname, filename)
-        if not os.path.exists(school_file_):
-            continue
-        school = gpd.read_file(school_file_)
+        school_file = os.path.join(cwd, data_dir, "school", sname, filename)
+        school = gpd.read_file(school_file)
 
         pbar.set_description(f"Processing {iso_code}")
         out_subfile = os.path.join(out_dir, f"{iso_code}_{name}.geojson")
 
         if not os.path.exists(out_subfile):
+            # Filter non-school POIs within the buffer of school locations
             school_sub = school[school["iso"] == iso_code]
             nonschool_sub = nonschool[nonschool["iso"] == iso_code]
 
@@ -290,7 +290,7 @@ def _filter_pois_within_school_vicinity(
             intersecting = school_temp.sjoin(nonschool_temp, how="inner")["index"]
             nonschool_sub = nonschool_sub[~nonschool_temp["index"].isin(intersecting)]
 
-            # Save country-level dataset
+            # Save filtered country-level dataset
             columns = config["columns"]
             nonschool_sub = nonschool_sub[columns]
             nonschool_sub.to_file(out_subfile, driver="GeoJSON")
@@ -298,7 +298,7 @@ def _filter_pois_within_school_vicinity(
         subdata = gpd.read_file(out_subfile).reset_index(drop=True)
         data.append(subdata)
 
-    # Combine datasets
+    # Combine and save datasets
     filtered_file = os.path.join(cwd, nonschool_dir, f"{name}.geojson")
     data = data_utils._concat_data(data)
     data.to_file(filtered_file, driver="GeoJSON")
@@ -334,6 +334,7 @@ def _filter_pois_with_matching_names(data, buffer_size, threshold, priority):
         # Compute rapidfuzz partial ratio score
         uid_edge_list = []
         for comb in combs:
+            # Compute the partial ratio score between cleaned names
             score = fuzz.partial_ratio(_clean_text(comb[0][1]), _clean_text(comb[1][1]))
             uid_edge_list.append(
                 (comb[0][0], comb[0][1], comb[1][0], comb[1][1], score)
@@ -357,6 +358,7 @@ def _filter_pois_with_matching_names(data, buffer_size, threshold, priority):
         }
 
         if len(groups) > 0:
+            # Assign groups to data points based on connected components
             data["group"] = np.nan
             for uid, value in groups.items():
                 data.loc[data["UID"] == uid, "group"] = value
@@ -389,15 +391,16 @@ def clean_data(config, category, iso_codes=None, name="clean", gee=False):
     """
 
     if gee:
-        gee_utils._initialize_gee()
+        gee_utils._initialize_gee() # Initialize Google Earth Engine if specified
 
-    # Output directory is data/vectors/school/clean
+    # Define the output directory for processed data based on the category and name
     out_dir = os.path.join(config["vectors_dir"], category, name)
-    out_dir = data_utils._makedir(out_dir)
-    iso_codes = config["iso_codes"]
+    out_dir = data_utils._makedir(out_dir) # Create directory if it doesn't exist
+    iso_codes = config["iso_codes"] # Fetch ISO codes from the config
 
     if category == "school":
         data_dir = os.path.join(config["vectors_dir"], category)
+        # Read data for the 'school' category, excluding the specified filename
         data = data_utils._read_data(data_dir, exclude=[f"{name}.geojson"])
 
     # For non-school locations, remove POIs within school vicinity
@@ -422,7 +425,7 @@ def clean_data(config, category, iso_codes=None, name="clean", gee=False):
             )
             subdata = subdata.sjoin(geoboundaries, how="left", predicate="within")
 
-            # Split the data into smaller admin boundaries fo scalability
+            # Split the data into smaller admin boundaries for scalability
             out_subdata = []
             for shape_name in subdata.shapeName.unique():
                 pbar.set_description(f"Processing {iso_code} {shape_name}")
@@ -453,7 +456,7 @@ def clean_data(config, category, iso_codes=None, name="clean", gee=False):
                         buffer_size=config["name_match_buffer_size"],
                     )[columns]
 
-                    # Filter uninhabited locations
+                    # Filter uninhabited locations based on specified buffer size
                     subsubdata = _filter_uninhabited_locations(
                         config,
                         subsubdata,
@@ -462,10 +465,11 @@ def clean_data(config, category, iso_codes=None, name="clean", gee=False):
                     )
                     out_subdata.append(subsubdata)
 
-            # Save cleaned file
+            # Save cleaned file as a GeoJSON
             out_subdata = data_utils._concat_data(out_subdata, verbose=False)
             out_subdata.to_file(out_subfile, driver="GeoJSON")
 
+        # Read and store the cleaned data
         out_subdata = gpd.read_file(out_subfile).reset_index(drop=True)
         out_subdata.to_file(out_subfile, driver="GeoJSON")
         out_data.append(out_subdata)
