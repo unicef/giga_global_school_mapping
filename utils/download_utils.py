@@ -2,15 +2,17 @@ import os
 import duckdb
 import geojson
 import overpass
-import swifter
 import data_utils
 import logging
 
+from tqdm import tqdm
 import pandas as pd
 import geopandas as gpd
-from tqdm.notebook import tqdm
 from country_bounding_boxes import country_subunits_by_iso_code
 
+import warnings
+warnings.filterwarnings('ignore')
+warnings.simplefilter('ignore')
 logging.basicConfig(level=logging.INFO)
 
 
@@ -31,28 +33,21 @@ def _query_osm(iso_code, out_file, query):
     return data
 
 
-def download_osm(iso_codes, category="school", source="osm"):
+def download_osm(config, category, source="osm"):
     """Downloads OSM POIs based on a list of ISO codes."""
 
-    data_config = data_utils._load_data_config()
-    out_dir = os.path.join(
-        data_config['data_dir'],
-        category,
-        source
-    )
+    out_dir = os.path.join(config["vectors_dir"], category, source)
     out_dir = data_utils._makedir(out_dir)
-    osm_file = os.path.join(
-        os.path.dirname(out_dir), 
-        f"{source}.geojson"
-    )
+    osm_file = os.path.join(os.path.dirname(out_dir), f"{source}.geojson")
+    iso_codes = config['iso_codes']
 
-    url = data_config["iso_regional_codes"]
+    url = config["iso_regional_codes"]
     codes = pd.read_csv(url)
 
-    keywords = data_config[category]
+    keywords = config[category]
     query = "".join(
         [
-        f"""node["{key}"~"^({"|".join(values)})"](area);
+            f"""node["{key}"~"^({"|".join(values)})"](area);
         way["{key}"~"^({"|".join(values)})"](area);
         rel["{key}"~"^({"|".join(values)})"](area);
         """
@@ -61,7 +56,9 @@ def download_osm(iso_codes, category="school", source="osm"):
     )
 
     data = []
-    for iso_code in (pbar := tqdm(iso_codes, total=len(iso_codes))):
+    bar_format = "{l_bar}{bar:20}{r_bar}{bar:-20b}"
+    pbar = tqdm(iso_codes, total=len(iso_codes), bar_format=bar_format)
+    for iso_code in pbar:
         pbar.set_description(f"Processing {iso_code}")
         filename = f"{iso_code}_{source}.geojson"
         out_subfile = os.path.join(out_dir, filename)
@@ -72,14 +69,14 @@ def download_osm(iso_codes, category="school", source="osm"):
 
         subdata = gpd.read_file(out_subfile).reset_index(drop=True)
         if len(subdata) > 0:
-            columns = data_config["columns"]
             subdata = data_utils._prepare_data(
-                subdata,
-                iso_code,
-                category,
-                source,
-                columns,
-                out_subfile,
+                config=config,
+                data=subdata,
+                iso_code=iso_code,
+                category=category,
+                source=source,
+                columns=config["columns"],
+                out_file=out_subfile,
             )
             data.append(subdata)
 
@@ -88,7 +85,7 @@ def download_osm(iso_codes, category="school", source="osm"):
     return data
 
 
-def _query_overture(iso_code, out_file, query):
+def _query_overture(config, iso_code, out_file, query):
     """Queries Overture Map for a given ISO code."""
 
     # Connect to DuckDB
@@ -104,8 +101,7 @@ def _query_overture(iso_code, out_file, query):
     )
 
     # Fetch country bounding box and execute Overture query
-    data_config = data_utils._load_data_config()
-    url = data_config["overture_url"]
+    url = config["overture_url"]
     bbox = [c.bbox for c in country_subunits_by_iso_code(iso_code)][0]
     overture_query = f"""
         COPY(
@@ -132,24 +128,17 @@ def _query_overture(iso_code, out_file, query):
     return data
 
 
-def download_overture(iso_codes, category, exclude=None, source="overture"):
+def download_overture(config, category, exclude="school", source="overture"):
     """Downloads Overture Map POIs based on a list of ISO codes."""
-    
-    # Generate output directory 
-    data_config = data_utils._load_data_config()
-    out_dir = os.path.join(
-        data_config['data_dir'],
-        category,
-        source
-    )
+
+    # Generate output directory
+    out_dir = os.path.join(config["vectors_dir"], category, source)
     out_dir = data_utils._makedir(out_dir)
-    overture_file = os.path.join(
-        os.path.dirname(out_dir), 
-        f"{source}.geojson"
-    )
-    
+    overture_file = os.path.join(os.path.dirname(out_dir), f"{source}.geojson")
+    iso_codes = config['iso_codes']
+
     # Fetch school keywords and generate keywords query
-    keywords = data_config[category]
+    keywords = config[category]
     query = " or ".join(
         [
             f"""UPPER(names) LIKE '%{keyword.replace('_', ' ').upper()}%'
@@ -160,7 +149,7 @@ def download_overture(iso_codes, category, exclude=None, source="overture"):
     )
 
     if exclude is not None:
-        exclude_keywords = data_config[exclude]
+        exclude_keywords = config[exclude]
         exclude_query = " and ".join(
             [
                 f"""UPPER(names) NOT LIKE '%{keyword.replace('_', ' ').upper()}%'
@@ -172,32 +161,34 @@ def download_overture(iso_codes, category, exclude=None, source="overture"):
         query = f""" ({query}) and ({exclude_query})"""
 
     data = []
-    for iso_code in (pbar := tqdm(iso_codes, total=len(iso_codes))):
+    for iso_code in (pbar := data_utils._create_progress_bar(iso_codes)):
         pbar.set_description(f"Processing {iso_code}")
         filename = f"{iso_code}_{source}.geojson"
         out_subfile = os.path.join(out_dir, filename)
 
         # Fetch Overture data
         if not os.path.exists(out_subfile):
-            _query_overture(iso_code, out_subfile, query)
+            _query_overture(config, iso_code, out_subfile, query)
 
         # Post-process data
         subdata = gpd.read_file(out_subfile).reset_index(drop=True)
         if len(subdata) > 0:
             # Extract name from overture data
             if "names" in subdata.columns:
-                geoboundary = data_utils._get_geoboundaries(iso_code)
-                subdata["name"] = subdata["names"].apply(lambda x: x["common"][0]["value"])
+                geoboundary = data_utils._get_geoboundaries(config, iso_code)
+                subdata["name"] = subdata["names"].apply(
+                    lambda x: x["common"][0]["value"]
+                )
                 subdata = gpd.sjoin(subdata, geoboundary, predicate="within")
-                
-            columns = data_config["columns"]
+
             subdata = data_utils._prepare_data(
-                subdata,
-                iso_code,
-                category,
-                source,
-                columns,
-                out_subfile,
+                config=config,
+                data=subdata,
+                iso_code=iso_code,
+                category=category,
+                source=source,
+                columns=config["columns"],
+                out_file=out_subfile,
             )
             data.append(subdata)
 
@@ -206,36 +197,32 @@ def download_overture(iso_codes, category, exclude=None, source="overture"):
     return data
 
 
-def load_unicef(category="school", source="unicef"):
+def load_unicef(config, category="school", source="unicef"):
     """Combines the UNICEF/Giga datasets into a single CSV file."""
-    
-    # Generate data directory 
-    data_config = data_utils._load_data_config()
-    data_dir = os.path.join(
-        data_config['data_dir'],
-        category,
-        source
-    )
+
+    # Generate data directory
+    data_dir = os.path.join(config["vectors_dir"], category, source)
     data_dir = data_utils._makedir(data_dir)
     files = next(os.walk(data_dir), (None, None, []))[2]
     logging.info(f"Number of CSV files: {len(files)}")
 
-    data = [] 
-    for file in (pbar := tqdm(files, total=len(files))):        
-        iso_code = file.split("_")[0]  
+    data = []
+    for file in (pbar := data_utils._create_progress_bar(files)):
+        iso_code = file.split("_")[0]
         pbar.set_description(f"Processing {iso_code}")
-        
+
         filename = os.path.join(data_dir, file)
-        subdata = pd.read_csv(filename, low_memory=False).reset_index(drop=True)
+        subdata = pd.read_csv(filename).reset_index(drop=True)
         subdata["geometry"] = gpd.GeoSeries.from_xy(subdata["lon"], subdata["lat"])
-        
-        columns = data_config["columns"] + ["giga_id_school"]
+        columns = config["columns"]
+
         subdata = data_utils._prepare_data(
-            subdata,
-            iso_code,
-            category,
-            source,
-            columns
+            config=config,
+            data=subdata,
+            iso_code=iso_code,
+            category=category,
+            source=source,
+            columns=columns,
         )
         data.append(subdata)
 
@@ -243,5 +230,4 @@ def load_unicef(category="school", source="unicef"):
     out_dir = os.path.dirname(data_dir)
     out_file = os.path.join(out_dir, f"{source}.geojson")
     data = data_utils._concat_data(data, out_file)
-    
     return data
