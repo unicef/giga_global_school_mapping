@@ -172,7 +172,7 @@ def generate_ghsl_per_country(config, layer="ghsl", exclude=[]):
 
 def _filter_uninhabited_locations(config, data, buffer_size, layer="ghsl", pbar=None):
     """
-    Filter uninhabited locations based on buffer size (in meters).
+    Filters uninhabited locations based on buffer size (in meters).
 
     Args:
     - config (dict): Configuration settings.
@@ -206,14 +206,18 @@ def _filter_uninhabited_locations(config, data, buffer_size, layer="ghsl", pbar=
         if not os.path.exists(ghsl_path):
             ghsl_path = os.path.join(cwd, rasters_dir, layer, config["ghsl_file"])
 
+        image = []
         if os.path.exists(ghsl_path):
             with rio.open(ghsl_path) as src:
-                if src.crs != "EPSG:4326":
-                    subdata = subdata.to_crs("ESRI:54009")
-                else:
-                    subdata = subdata.to_crs(src.crs)
-                geometry = [subdata.iloc[0]["geometry"]]
-                image, transform = rio.mask.mask(src, geometry, crop=True)
+                try:
+                    if src.crs != "EPSG:4326":
+                        subdata = subdata.to_crs("ESRI:54009")
+                    else:
+                        subdata = subdata.to_crs(src.crs)
+                    geometry = [subdata.iloc[0]["geometry"]]
+                    image, transform = rio.mask.mask(src, geometry, crop=True)
+                except:
+                    pixel_sum = 0
         else:
             image, region = gee_utils.generate_gee_image(subdata[["geometry"]], layer)
             file = gee_utils.export_image(
@@ -222,9 +226,11 @@ def _filter_uninhabited_locations(config, data, buffer_size, layer="ghsl", pbar=
             with rio.open(file[0], "r") as src:
                 image = src.read(1)
 
-        image[image == -32768] = 0
-        image[image == 255] = 0
-        pixel_sum = image.sum()
+        if len(image) > 0:
+            image[image == -32768] = 0
+            image[image == 255] = 0
+            pixel_sum = image.sum()
+
         ghsl_sum.append(pixel_sum)
 
     data[layer] = ghsl_sum
@@ -248,6 +254,7 @@ def _filter_pois_within_school_vicinity(
     Returns:
     - GeoDataFrame: Processed and filtered GeoDataFrame containing non-school POIs.
     """
+    
     # Get the current working directory
     cwd = os.path.dirname(os.getcwd())
 
