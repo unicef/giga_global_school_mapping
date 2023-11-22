@@ -20,7 +20,7 @@ ghsl_file: "global/GHS_BUILT_C_FUN_E2018_GLOBE_R2023A_54009_10_V1_0.tif"
 buffer_size: 25
 school_buffer_size: 150
 name_match_threshold: 85
-name_match_buffer_size: 150
+name_match_buffer_size: 250
 ghsl_buffer_size: 150
 priority: ["OVERTURE", "OSM", "UNICEF"]
 
