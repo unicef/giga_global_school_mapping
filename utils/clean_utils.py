@@ -16,9 +16,9 @@ from scipy.sparse.csgraph import connected_components
 
 import data_utils
 import gee_utils
-
 import warnings
 
+SEED = 42
 warnings.filterwarnings("ignore")
 warnings.simplefilter("ignore")
 logging.basicConfig(level=logging.INFO)
@@ -78,7 +78,7 @@ def _connect_components(data, buffer_size):
     temp = data.copy()
     if data.crs != "EPSG:3857":
         temp = data_utils._convert_to_crs(data, target_crs="EPSG:3857")
-    geometry = temp["geometry"].buffer(buffer_size)
+    geometry = temp["geometry"].buffer(buffer_size, cap_style=3)
     overlap_matrix = geometry.apply(lambda x: geometry.overlaps(x)).values.astype(int)
     n, groups = connected_components(overlap_matrix, directed=False)
     data["group"] = groups
@@ -125,7 +125,7 @@ def _filter_keywords(data, exclude, column="name"):
     return data
 
 
-def generate_ghsl_per_country(config, layer="ghsl", exclude=[]):
+def generate_ghsl_per_country(config, layer="ghsl", iso_codes=[], exclude=[]):
     """
     Generates GHSL (Global Human Settlement Layer) data per country.
 
@@ -139,12 +139,12 @@ def generate_ghsl_per_country(config, layer="ghsl", exclude=[]):
     """
 
     cwd = os.path.dirname(os.getcwd())
-    iso_codes = list(set(config["iso_codes"]) - set(exclude))
+    if len(iso_codes) == 0:
+        iso_codes = list(set(config["iso_codes"]) - set(exclude))
 
     for iso_code in (pbar := data_utils._create_progress_bar(iso_codes)):
-        rasters_dir = config["rasters_dir"]
-        ghsl_path = os.path.join(cwd, rasters_dir, layer, config["ghsl_file"])
-        out_tif = os.path.join(cwd, rasters_dir, layer, f"{iso_code}_{layer}.tif")
+        ghsl_path = os.path.join(cwd, config["rasters_dir"], layer, config["ghsl_file"])
+        out_tif = os.path.join(cwd, config["rasters_dir"], layer, f"{iso_code}_{layer}.tif")
         pbar.set_description(f"Processing {iso_code}")
 
         if not os.path.exists(out_tif):
@@ -170,6 +170,74 @@ def generate_ghsl_per_country(config, layer="ghsl", exclude=[]):
                 dest.write(out_image)
 
 
+def _generate_additional_non_school(
+    config, 
+    iso_code, 
+    buffer_size,
+    spacing,
+    sname="clean"
+):
+    """
+    Generates additional non-school points based on given configurations and spatial parameters.
+
+    Args:
+    - config (dict): Configuration settings.
+    - iso_code (str): ISO code for a specific location.
+    - buffer_size (float): Buffer size for points.
+    - spacing (float): Spacing between points.
+    - sname (str, optional): Name identifier (default is "clean").
+
+    Returns:
+    - GeoDataFrame: GeoDataFrame containing generated non-school points.
+    """
+    # Get current working directory
+    cwd = os.path.dirname(os.getcwd())
+
+     # Get geographical boundaries for the ISO code at the specified administrative level
+    bounds = data_utils._get_geoboundaries(config, iso_code, adm_level="ADM0")
+    bounds = bounds.to_crs("EPSG:3857") # Convert to EPSG:3857
+
+    # Calculate bounds for generating XY coordinates
+    xmin, ymin, xmax, ymax = bounds.total_bounds 
+    xcoords = [c for c in np.arange(xmin, xmax, spacing)]
+    ycoords = [c for c in np.arange(ymin, ymax, spacing)] 
+    
+    # Create all combinations of XY coordinates
+    coordinate_pairs = np.array(np.meshgrid(xcoords, ycoords)).T.reshape(-1, 2) 
+    # Create a list of Shapely points
+    geometries = gpd.points_from_xy(coordinate_pairs[:,0], coordinate_pairs[:,1]) 
+
+    # Create a GeoDataFrame of points and perform spatial join with bounds
+    points = gpd.GeoDataFrame(geometry=geometries, crs=bounds.crs).reset_index(drop=True)
+    points = gpd.sjoin(points, bounds, predicate='within')
+    points = points.drop(['index_right'], axis=1)
+
+    # Read school data and perform buffer operation on geometries
+    filename = f"{iso_code}_{sname}.geojson"
+    school_file = os.path.join(cwd, config["vectors_dir"], "school", sname, filename)
+    school = gpd.read_file(school_file).to_crs("EPSG:3857")
+    school["geometry"] = school["geometry"].buffer(buffer_size, cap_style=3)
+    points["geometry"] = points["geometry"].buffer(buffer_size, cap_style=3)
+
+     # Identify intersecting points and remove them
+    points["index"] = points.index
+    intersecting = school.sjoin(points, how="inner")["index"]
+    points = points[~points["index"].isin(intersecting)]
+    points["geometry"] = points["geometry"].centroid
+    points = points.to_crs("ESRI:54009")
+
+    # Sample points from the GHSL raster
+    coord_list = [(x, y) for x, y in zip(points["geometry"].x, points["geometry"].y)]
+    ghsl_path = os.path.join(cwd, config["rasters_dir"], "ghsl", config["ghsl_file"])
+    with rio.open(ghsl_path) as src:
+        points["ghsl"] = [x[0] for x in src.sample(coord_list)]
+
+    # Filter points with GHSL greater than 0 and convert back to EPSG:4326
+    points = points[points['ghsl'] > 0]
+    points = points.to_crs("EPSG:4326")
+    return points
+
+
 def _filter_uninhabited_locations(config, data, buffer_size, layer="ghsl", pbar=None):
     """
     Filters uninhabited locations based on buffer size (in meters).
@@ -184,7 +252,7 @@ def _filter_uninhabited_locations(config, data, buffer_size, layer="ghsl", pbar=
     Returns:
     - DataFrame: Filtered DataFrame containing inhabited locations.
     """
-
+    
     cwd = os.path.dirname(os.getcwd())
     rasters_dir = config["rasters_dir"]
     data = data.reset_index(drop=True)
@@ -210,14 +278,11 @@ def _filter_uninhabited_locations(config, data, buffer_size, layer="ghsl", pbar=
         if os.path.exists(ghsl_path):
             with rio.open(ghsl_path) as src:
                 try:
-                    if src.crs != "EPSG:4326":
-                        subdata = subdata.to_crs("ESRI:54009")
-                    else:
-                        subdata = subdata.to_crs(src.crs)
+                    subdata = subdata.to_crs(src.crs)
                     geometry = [subdata.iloc[0]["geometry"]]
                     image, transform = rio.mask.mask(src, geometry, crop=True)
                 except:
-                    pixel_sum = 0
+                    image = []
         else:
             image, region = gee_utils.generate_gee_image(subdata[["geometry"]], layer)
             file = gee_utils.export_image(
@@ -227,7 +292,7 @@ def _filter_uninhabited_locations(config, data, buffer_size, layer="ghsl", pbar=
                 image = src.read(1)
 
         if len(image) > 0:
-            image[image == -32768] = 0
+            image[image < 0] = 0
             image[image == 255] = 0
             pixel_sum = image.sum()
 
@@ -288,10 +353,10 @@ def _filter_pois_within_school_vicinity(
             nonschool_temp = data_utils._convert_to_crs(
                 nonschool_sub, target_crs="EPSG:3857"
             )
-            nonschool_temp["geometry"] = nonschool_temp["geometry"].buffer(buffer_size)
+            nonschool_temp["geometry"] = nonschool_temp["geometry"].buffer(buffer_size, cap_style=3)
             nonschool_temp["index"] = nonschool_sub.index
             school_temp = data_utils._convert_to_crs(school_sub, target_crs="EPSG:3857")
-            school_temp["geometry"] = school_temp["geometry"].buffer(buffer_size)
+            school_temp["geometry"] = school_temp["geometry"].buffer(buffer_size, cap_style=3)
 
             # Filter out non-school POIs that intersect with buffered school locations
             intersecting = school_temp.sjoin(nonschool_temp, how="inner")["index"]
@@ -487,3 +552,61 @@ def clean_data(config, category, iso_codes=None, name="clean", gee=False):
     data.to_file(out_file, driver="GeoJSON")
 
     return data
+
+def augment_non_school_data(config, category="non_school", name="clean"):
+    """
+    Augments non-school data by generating additional points and combining datasets 
+    based on provided configurations.
+
+    Args:
+    - config (dict): Configuration settings.
+    - category (str, optional): Category of data (default is "non_school").
+    - name (str, optional): Name identifier (default is "clean").
+
+    Returns:
+    - None: The function saves the combined dataset as a GeoJSON file.
+
+    Raises:
+    - FileNotFoundError: If the specified file or directory does not exist.
+    - Exception: If there is an issue during data processing or concatenation.
+    """
+    
+    cwd = os.path.dirname(os.getcwd())
+
+    data = []
+    counts = data_utils.get_counts(config, column='iso')
+    counts = counts[counts.non_school < counts.school]
+    logging.info(counts)
+    
+    for iso_code in (pbar := data_utils._create_progress_bar(counts.index)):
+        pbar.set_description(f"Processing {iso_code}")
+        subdata = counts[counts.index == iso_code]
+        
+        filename = f"{iso_code}_{name}.geojson"
+        non_school_file = os.path.join(cwd, config["vectors_dir"], category, name, filename)
+        non_school = gpd.read_file(non_school_file)
+        
+        buffer_size = config["school_buffer_size"]
+        points = _generate_additional_non_school(
+            config, iso_code, buffer_size, spacing=buffer_size*2
+        )
+        points = data_utils._prepare_data(
+            config=config,
+            data=points,
+            iso_code=iso_code,
+            category=category,
+            source="GHSL",
+            columns=config["columns"],
+        )
+        size = subdata.school.iloc[0] - subdata.non_school.iloc[0]
+        points = points.sample(size, random_state=SEED)
+        non_school = data_utils._concat_data([points, non_school], non_school_file)
+            
+        data.append(non_school)
+
+    # Save combined dataset
+    out_dir = os.path.join(config["vectors_dir"], category)
+    out_file = os.path.join(out_dir, f"{name}.geojson")
+    data = data_utils._concat_data(data, out_file)
+    data.to_file(out_file, driver="GeoJSON")
+    

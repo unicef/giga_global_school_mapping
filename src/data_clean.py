@@ -19,8 +19,9 @@ def main():
     config_file = os.path.join(cwd, "configs/data_config.yaml")
     config = config_utils.create_config(config_file)
 
-    schools = clean_utils.clean_data(config, category="school", gee=False)
-    nonschools = clean_utils.clean_data(config, category="non_school", gee=False)
+    schools = clean_utils.clean_data(config, category="school")
+    nonschools = clean_utils.clean_data(config, category="non_school")
+    clean_utils.augment_non_school_data(config, category="non_school")
 
 
 if __name__ == "__main__":
