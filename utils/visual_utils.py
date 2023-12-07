@@ -137,7 +137,7 @@ def data_cleaning(
 
     samples = data.iloc[start_index : start_index + (n_rows * n_cols)]
     grid = GridspecLayout(n_rows * row_inc + n_rows, n_cols)
-    button_dict = {0: ("primary", category), -1: ("warning", "removed")}
+    button_dict = {0: ("primary", category), -1: ("warning", "unrecognized")}
 
     def _add_image(item):
         """

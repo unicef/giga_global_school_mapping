@@ -17,7 +17,17 @@ logging.basicConfig(level=logging.INFO)
 
 
 def _query_osm(iso_code, out_file, query):
-    """Queries OSM for a given ISO code."""
+    """
+    Queries OpenStreetMap (OSM) for a given ISO code and saves the result in a GeoJSON file.
+
+    Args:
+    - iso_code (str): ISO code of the country.
+    - out_file (str): File path to save the queried OSM data in GeoJSON format.
+    - query (str): OSM query string.
+
+    Returns:
+    - GeoDataFrame: GeoDataFrame containing the queried OSM data.
+    """
 
     api = overpass.API(timeout=1500)
     osm_query = f"""
@@ -34,7 +44,17 @@ def _query_osm(iso_code, out_file, query):
 
 
 def download_osm(config, category, source="osm"):
-    """Downloads OSM POIs based on a list of ISO codes."""
+    """
+    Downloads OpenStreetMap (OSM) Points of Interest (POIs) based on a list of ISO codes.
+
+    Args:
+    - config (dict): Configuration settings.
+    - category (str): Type of data category to download.
+    - source (str, optional): Source identifier for the downloaded data. Defaults to "osm".
+
+    Returns:
+    - GeoDataFrame: Combined and processed GeoDataFrame containing OSM POIs.
+    """
 
     out_dir = os.path.join(config["vectors_dir"], category, source)
     out_dir = data_utils._makedir(out_dir)
@@ -56,9 +76,7 @@ def download_osm(config, category, source="osm"):
     )
 
     data = []
-    bar_format = "{l_bar}{bar:20}{r_bar}{bar:-20b}"
-    pbar = tqdm(iso_codes, total=len(iso_codes), bar_format=bar_format)
-    for iso_code in pbar:
+    for iso_code in (pbar := data_utils._create_progress_bar(iso_codes)):
         pbar.set_description(f"Processing {iso_code}")
         filename = f"{iso_code}_{source}.geojson"
         out_subfile = os.path.join(out_dir, filename)
@@ -86,7 +104,18 @@ def download_osm(config, category, source="osm"):
 
 
 def _query_overture(config, iso_code, out_file, query):
-    """Queries Overture Map for a given ISO code."""
+    """
+    Queries Overture Map for a given ISO code.
+
+    Args:
+    - config (dict): Configuration settings.
+    - iso_code (str): ISO code for a specific country.
+    - out_file (str): Output file path to save the queried data.
+    - query (str): Query string to filter data from Overture Map.
+
+    Returns:
+    - GeoDataFrame: Queried and processed data as a GeoDataFrame.
+    """
 
     # Connect to DuckDB
     db = duckdb.connect()
@@ -129,7 +158,19 @@ def _query_overture(config, iso_code, out_file, query):
 
 
 def download_overture(config, category, exclude="school", source="overture"):
-    """Downloads Overture Map POIs based on a list of ISO codes."""
+    """
+    Downloads Overture Map points of interest (POIs) based on a list of ISO codes.
+
+    Args:
+    - config (dict): Configuration settings.
+    - category (str): Type of data category ('school' or 'non_school').
+    - exclude (str or None, optional): Keywords to exclude ('school' or 'non_school'). 
+      Defaults to 'school'.
+    - source (str, optional): Source identifier for Overture Map dataset. Defaults to 'overture'.
+
+    Returns:
+    - GeoDataFrame: Combined GeoDataFrame containing downloaded Overture Map POIs.
+    """
 
     # Generate output directory
     out_dir = os.path.join(config["vectors_dir"], category, source)
@@ -198,7 +239,19 @@ def download_overture(config, category, exclude="school", source="overture"):
 
 
 def load_unicef(config, category="school", source="unicef"):
-    """Combines the UNICEF/Giga datasets into a single CSV file."""
+    """
+    Combines the UNICEF/Giga datasets into a single GeoJSON file.
+
+    Args:
+    - config (dict): Configuration settings.
+    - category (str, optional): Type of data category ('school' or 'non_school'). 
+      Defaults to 'school'.
+    - source (str, optional): Source identifier for UNICEF/Giga dataset. 
+      Defaults to 'unicef'.
+
+    Returns:
+    - GeoDataFrame: Combined GeoDataFrame from UNICEF/Giga datasets.
+    """
 
     # Generate data directory
     data_dir = os.path.join(config["vectors_dir"], category, source)

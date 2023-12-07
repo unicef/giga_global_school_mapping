@@ -165,11 +165,9 @@ def _prepare_data(config, data, iso_code, category, source, columns, out_file=No
     Returns:
     - DataFrame: Processed DataFrame with uniform columns and added information.
     """
-
-    if "name" not in data.columns:
-        data["name"] = None
-    if "giga_id_school" not in data.columns:
-        data["giga_id_school"] = None
+    for column in columns:
+        if column not in data.columns:
+            data[column] = None
 
     data["source"] = source.upper()
     data = data.drop_duplicates("geometry", keep="first")
@@ -251,3 +249,35 @@ def _read_data(data_dir, exclude=[]):
     data = gpd.GeoDataFrame(pd.concat(data).copy(), crs="EPSG:4326")
     data = data.drop_duplicates("geometry", keep="first")
     return data
+
+
+def get_counts(config, column='iso', categories=["school", "non_school"], layer="clean"):
+    """
+    Retrieves the counts of specified categories based on a given column in the GeoJSON layers.
+
+    Args:
+    - config (dict): Configuration settings.
+    - column (str, optional): Column to consider for counting. Defaults to 'iso'.
+    - categories (list, optional): List of categories to count. Defaults to ["school", "non_school"].
+    - layer (str, optional): Layer name to extract data from. Defaults to "clean".
+
+    Returns:
+    - DataFrame: Counts of specified categories based on the given column.
+    """
+    
+    cwd = os.path.dirname(os.getcwd())
+    data = []
+    for category in categories:
+        file = os.path.join(cwd, config['vectors_dir'], category, f"{layer}.geojson")
+        subdata = gpd.read_file(file)
+        data.append(subdata)
+    
+    counts = pd.merge(
+        data[0][column].value_counts(), 
+        data[1][column].value_counts(), 
+        left_index=True, 
+        right_index=True
+    )
+    counts.columns = categories
+    return counts
+    
