@@ -21,7 +21,7 @@ SEED = 42
 logging.basicConfig(level=logging.INFO)
 
 
-def download_images(
+def download_sat_images(
     creds,
     config,
     category,
@@ -32,6 +32,24 @@ def download_images(
     name="clean",
     filename=None,
 ):
+    """
+    Downloads satellite images based on geographic data points.
+
+    Args:
+    - creds (dict): Credentials for accessing the satellite image service.
+    - config (dict): Configuration settings.
+    - category (str): Type of data category.
+    - iso (str, optional): ISO code for the country. Defaults to None.
+    - sample_size (int, optional): Number of samples to consider. Defaults to None.
+    - src_crs (str, optional): Source coordinate reference system. Defaults to "EPSG:4326".
+    - id_col (str, optional): Column name containing unique identifiers. Defaults to "UID".
+    - name (str, optional): Name of the dataset. Defaults to "clean".
+    - filename (str, optional): File name to load the data. Defaults to None.
+
+    Returns:
+    - None
+    """
+    
     cwd = os.path.dirname(os.getcwd())
     vectors_dir = config["VECTORS_DIR"]
 
@@ -53,7 +71,8 @@ def download_images(
     url = f"{config['DIGITALGLOBE_URL']}connectid={creds['CONNECT_ID']}"
     wms = WebMapService(url, username=creds["USERNAME"], password=creds["PASSWORD"])
 
-    for index in tqdm(range(len(data))):
+    bar_format = "{l_bar}{bar:20}{r_bar}{bar:-20b}"
+    for index in tqdm(range(len(data)), bar_format=bar_format):
         image_file = os.path.join(out_dir, f"{data[id_col][index]}.tiff")
         if not os.path.exists(image_file):
             bbox = (
