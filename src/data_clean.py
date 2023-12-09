@@ -21,8 +21,6 @@ def main():
 
     schools = clean_utils.clean_data(config, category="school")
     nonschools = clean_utils.clean_data(config, category="non_school")
-    clean_utils.augment_non_school_data(config, category="non_school")
-
 
 if __name__ == "__main__":
     main()
