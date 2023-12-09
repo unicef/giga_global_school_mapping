@@ -238,6 +238,69 @@ def _generate_additional_non_school(
     return points
 
 
+def _augment_non_school_data(config, category="non_school", name="clean"):
+    """
+    Augments non-school data by generating additional points and combining datasets 
+    based on provided configurations.
+
+    Args:
+    - config (dict): Configuration settings.
+    - category (str, optional): Category of data (default is "non_school").
+    - name (str, optional): Name identifier (default is "clean").
+
+    Returns:
+    - None: The function saves the combined dataset as a GeoJSON file.
+
+    Raises:
+    - FileNotFoundError: If the specified file or directory does not exist.
+    - Exception: If there is an issue during data processing or concatenation.
+    """
+    
+    cwd = os.path.dirname(os.getcwd())
+
+    data = []
+    counts = data_utils.get_counts(config, column='iso')
+    logging.info(counts)
+
+    items = list(counts.index[::-1])
+    for iso_code in (pbar := data_utils._create_progress_bar(items)):
+        pbar.set_description(f"Processing {iso_code}")
+        subdata = counts[counts.index == iso_code]
+        
+        filename = f"{iso_code}_{name}.geojson"
+        non_school_file = os.path.join(cwd, config["vectors_dir"], category, name, filename)
+        non_school = gpd.read_file(non_school_file)
+
+        if subdata.non_school.iloc[0] < subdata.school.iloc[0]:
+            buffer_size = config["school_buffer_size"]
+            points = _generate_additional_non_school(
+                config, iso_code, buffer_size, spacing=buffer_size*2
+            )
+            points = data_utils._prepare_data(
+                config=config,
+                data=points,
+                iso_code=iso_code,
+                category=category,
+                source="GHSL",
+                columns=config["columns"]+["ghsl"],
+            )
+            size = subdata.school.iloc[0] - subdata.non_school.iloc[0]
+            points = points.sample(size, random_state=SEED)
+            non_school = data_utils._concat_data(
+                [points, non_school], 
+                non_school_file,
+                verbose=False
+            )
+            
+        data.append(non_school)
+
+    # Save combined dataset
+    out_dir = os.path.join(cwd, config["vectors_dir"], category)
+    out_file = os.path.join(out_dir, f"{name}.geojson")
+    data = data_utils._concat_data(data, out_file)
+    return data
+
+
 def _filter_uninhabited_locations(config, data, buffer_size, layer="ghsl", pbar=None):
     """
     Filters uninhabited locations based on buffer size (in meters).
@@ -372,8 +435,7 @@ def _filter_pois_within_school_vicinity(
 
     # Combine and save datasets
     filtered_file = os.path.join(cwd, nonschool_dir, f"{name}.geojson")
-    data = data_utils._concat_data(data)
-    data.to_file(filtered_file, driver="GeoJSON")
+    data = data_utils._concat_data(data, out_file=filtered_file)
     return data
 
 
@@ -474,7 +536,6 @@ def clean_data(config, category, iso_codes=None, name="clean", gee=False):
         data_dir = os.path.join(config["vectors_dir"], category)
         # Read data for the 'school' category, excluding the specified filename
         data = data_utils._read_data(data_dir, exclude=[f"{name}.geojson"])
-
     # For non-school locations, remove POIs within school vicinity
     elif category == "non_school":
         data = _filter_pois_within_school_vicinity(
@@ -513,14 +574,14 @@ def clean_data(config, category, iso_codes=None, name="clean", gee=False):
                             subsubdata, exclude=config["exclude"]
                         )[columns]
 
-                    # Remove schools within 50 meters of each other
+                    # Remove POIs within 50 meters of each other
                     subsubdata = _filter_pois_within_distance(
                         subsubdata,
                         buffer_size=config["buffer_size"],
                         priority=config["priority"],
                     )[columns]
 
-                    # Remove schools with matching names within 500 meters of each other
+                    # Remove POIs with matching names within 500 meters of each other
                     subsubdata = _filter_pois_with_matching_names(
                         subsubdata,
                         priority=config["priority"],
@@ -538,8 +599,11 @@ def clean_data(config, category, iso_codes=None, name="clean", gee=False):
                     out_subdata.append(subsubdata)
 
             # Save cleaned file as a GeoJSON
-            out_subdata = data_utils._concat_data(out_subdata, verbose=False)
-            out_subdata.to_file(out_subfile, driver="GeoJSON")
+            out_subdata = data_utils._concat_data(
+                out_subdata, 
+                out_file=out_subfile, 
+                verbose=False
+            )
 
         # Read and store the cleaned data
         out_subdata = gpd.read_file(out_subfile).reset_index(drop=True)
@@ -549,64 +613,9 @@ def clean_data(config, category, iso_codes=None, name="clean", gee=False):
     # Save combined dataset
     out_file = os.path.join(os.path.dirname(out_dir), f"{name}.geojson")
     data = data_utils._concat_data(out_data, out_file)
-    data.to_file(out_file, driver="GeoJSON")
 
+    if category == "non_school":
+        data = _augment_non_school_data(config, category)
+    
     return data
-
-def augment_non_school_data(config, category="non_school", name="clean"):
-    """
-    Augments non-school data by generating additional points and combining datasets 
-    based on provided configurations.
-
-    Args:
-    - config (dict): Configuration settings.
-    - category (str, optional): Category of data (default is "non_school").
-    - name (str, optional): Name identifier (default is "clean").
-
-    Returns:
-    - None: The function saves the combined dataset as a GeoJSON file.
-
-    Raises:
-    - FileNotFoundError: If the specified file or directory does not exist.
-    - Exception: If there is an issue during data processing or concatenation.
-    """
-    
-    cwd = os.path.dirname(os.getcwd())
-
-    data = []
-    counts = data_utils.get_counts(config, column='iso')
-    counts = counts[counts.non_school < counts.school]
-    logging.info(counts)
-    
-    for iso_code in (pbar := data_utils._create_progress_bar(counts.index)):
-        pbar.set_description(f"Processing {iso_code}")
-        subdata = counts[counts.index == iso_code]
-        
-        filename = f"{iso_code}_{name}.geojson"
-        non_school_file = os.path.join(cwd, config["vectors_dir"], category, name, filename)
-        non_school = gpd.read_file(non_school_file)
-        
-        buffer_size = config["school_buffer_size"]
-        points = _generate_additional_non_school(
-            config, iso_code, buffer_size, spacing=buffer_size*2
-        )
-        points = data_utils._prepare_data(
-            config=config,
-            data=points,
-            iso_code=iso_code,
-            category=category,
-            source="GHSL",
-            columns=config["columns"],
-        )
-        size = subdata.school.iloc[0] - subdata.non_school.iloc[0]
-        points = points.sample(size, random_state=SEED)
-        non_school = data_utils._concat_data([points, non_school], non_school_file)
-            
-        data.append(non_school)
-
-    # Save combined dataset
-    out_dir = os.path.join(config["vectors_dir"], category)
-    out_file = os.path.join(out_dir, f"{name}.geojson")
-    data = data_utils._concat_data(data, out_file)
-    data.to_file(out_file, driver="GeoJSON")
     
