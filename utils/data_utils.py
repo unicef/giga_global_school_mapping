@@ -121,9 +121,8 @@ def _concat_data(data, out_file=None, verbose=True):
 
     if out_file:
         data.to_file(out_file, driver="GeoJSON")
-        logging.info(f"Generated {out_file}")
-
     if verbose:
+        logging.info(f"Generated {out_file}")
         logging.info(f"Data dimensions: {data.shape}, CRS: {data.crs}")
 
     return data
@@ -251,7 +250,7 @@ def _read_data(data_dir, exclude=[]):
     return data
 
 
-def get_counts(config, column='iso', categories=["school", "non_school"], layer="clean"):
+def get_counts(config, column='iso', categories=["school", "non_school"]):
     """
     Retrieves the counts of specified categories based on a given column in the GeoJSON layers.
 
@@ -266,15 +265,32 @@ def get_counts(config, column='iso', categories=["school", "non_school"], layer=
     """
     
     cwd = os.path.dirname(os.getcwd())
-    data = []
+    data = {category: [] for category in categories}
+    
+    iso_codes = config["iso_codes"]
+    for iso_code in (pbar := _create_progress_bar(iso_codes)):
+        pbar.set_description(f"Reading {iso_code}")
+        for category in categories:
+            dir = os.path.join(cwd, config['vectors_dir'], category)
+
+            layer = "validated"
+            filepath = os.path.join(dir, layer, "{iso_code}_{layer}.geojson")
+            if not os.path.isfile(filepath):
+                layer = "clean"
+                filepath = os.path.join(dir, layer, f"{iso_code}_{layer}.geojson")
+                
+            subdata = gpd.read_file(filepath)
+            if layer == "validated":
+                subdata = subdata[subdata[layer] == 0]
+                
+            data[category].append(subdata)
+
     for category in categories:
-        file = os.path.join(cwd, config['vectors_dir'], category, f"{layer}.geojson")
-        subdata = gpd.read_file(file)
-        data.append(subdata)
+        data[category] = pd.concat(data[category])
     
     counts = pd.merge(
-        data[0][column].value_counts(), 
-        data[1][column].value_counts(), 
+        data[categories[0]][column].value_counts(), 
+        data[categories[1]][column].value_counts(), 
         left_index=True, 
         right_index=True
     )
