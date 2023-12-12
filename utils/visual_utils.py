@@ -10,6 +10,7 @@ from ipywidgets import Layout, GridspecLayout, Button, Image
 from rasterio.plot import show
 import matplotlib.pyplot as plt
 from IPython.display import display
+import translators as ts
 
 logging.basicConfig(level=logging.INFO)
 
@@ -74,7 +75,12 @@ def map_coordinates(
             filename = _get_filename(cwd, iso, vector_dir, category, "clean")
 
     data = gpd.read_file(filename)
-    logging.info(data.iloc[index]["name"])
+
+    name = data.iloc[index]["name"]
+    logging.info(data.iloc[index]["UID"])
+    logging.info(name)
+    if name:
+        logging.info(ts.translate_text(name, translator="google"))
     coords = data.iloc[index].geometry.y, data.iloc[index].geometry.x
     map = folium.Map(location=coords, zoom_start=zoom_start, max_zoom=max_zoom)
     folium.TileLayer(
@@ -88,7 +94,7 @@ def map_coordinates(
     display(map)
 
 
-def data_cleaning(
+def validate_data(
     config,
     iso,
     category,
@@ -234,6 +240,7 @@ def inspect_images(
     start_index=0,
     figsize=(15, 15),
     filename=None,
+    random=False,
     name="validated",
 ):
     """
@@ -268,6 +275,8 @@ def inspect_images(
 
     # Load geographic data from the file
     data = gpd.read_file(filename)
+    if random:
+        data = data.sample(frac=1.0)
     # Filter data if the specified name column exists
     if name in data.columns:
         data = data[data[name] > -1]
