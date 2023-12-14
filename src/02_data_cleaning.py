@@ -9,7 +9,6 @@ import clean_utils
 import config_utils
 
 import warnings
-
 warnings.filterwarnings("ignore")
 warnings.simplefilter("ignore")
 
@@ -21,6 +20,7 @@ def main():
 
     schools = clean_utils.clean_data(config, category="school")
     nonschools = clean_utils.clean_data(config, category="non_school")
+
 
 if __name__ == "__main__":
     main()
