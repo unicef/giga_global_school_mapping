@@ -50,13 +50,12 @@ def _makedir(out_dir):
     return out_dir
 
 
-def _get_iso_regions(config, data, iso_code):
+def _get_iso_regions(config, iso_code):
     """
     Adds country, region, and subregion information to a DataFrame based on ISO codes.
 
     Args:
     - config (dict): Configuration settings.
-    - data (DataFrame): DataFrame containing location data.
     - iso_code (str): ISO code for the country.
 
     Returns:
@@ -66,12 +65,11 @@ def _get_iso_regions(config, data, iso_code):
     # Load ISO codes of countries and regions/subregions
     codes = pd.read_csv(config["iso_regional_codes"])
     subcode = codes.query(f"`alpha-3` == '{iso_code}'")
-    data["iso"] = iso_code
-    data["country"] = subcode["name"].values[0]
-    data["subregion"] = subcode["sub-region"].values[0]
-    data["region"] = subcode["region"].values[0]
+    country = subcode["name"].values[0]
+    subregion = subcode["sub-region"].values[0]
+    region = subcode["region"].values[0]
 
-    return data
+    return country, subregion, region
 
 
 def _convert_to_crs(data, src_crs="EPSG:4326", target_crs="EPSG:3857"):
@@ -170,7 +168,13 @@ def _prepare_data(config, data, iso_code, category, source, columns, out_file=No
 
     data["source"] = source.upper()
     data = data.drop_duplicates("geometry", keep="first")
-    data = _get_iso_regions(config, data, iso_code)
+    country, region, subregion = _get_iso_regions(config, data, iso_code)
+    data["iso"] = iso_code
+    data["country"] = country
+    data["subregion"] = region
+    data["region"] = subregion
+    
+    
     data = _generate_uid(data, category)
     data = data[columns]
 

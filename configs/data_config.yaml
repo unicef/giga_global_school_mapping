@@ -2,27 +2,27 @@ vectors_dir: 'data/vectors/'
 rasters_dir: 'data/rasters/'
 columns: ['UID', 'source', 'iso', 'country', 'region', 'subregion', 'name', 'geometry', 'giga_id_school']
 iso_codes: [
-    'AIA', 'ATG', 'BEN', 'BIH', 'BLZ', 'BRA', 'BRB', 'BWA', 'CRI', 'DMA', 
-    'GHA', 'GIN', 'GRD', 'HND', 'HUN', 'KAZ', 'KEN', 'KIR', 'KNA', 'LCA', 
-    'MDG', 'MNG', 'MSR', 'MWI', 'NAM', 'NER', 'NGA', 'PAN', 'RWA', 'SEN', 
-    'SLE', 'SLV', 'SSD', 'THA', 'TTO', 'UKR', 'UZB', 'VCT', 'VGB', 'YEM', 
+    'YEM', 'SEN', 'MDG', 'AIA', 'ATG', 'BEN', 'BIH', 'BLZ', 'BRA', 'BRB', 
+    'BWA', 'CRI', 'DMA', 'GHA', 'GIN', 'GRD', 'HND', 'HUN', 'KAZ', 'KEN', 
+    'KIR', 'KNA', 'LCA', 'MNG', 'MSR', 'MWI', 'NAM', 'NER', 'NGA', 'PAN', 
+    'RWA', 'SLE', 'SLV', 'SSD', 'THA', 'TTO', 'UKR', 'UZB', 'VCT', 'VGB', 
     'ZAF', 'ZWE'
 ]
+
+# Data cleaning
+buffer_size: 25
+school_buffer_size: 150
+layer_buffer_size: 150
+non_school_spacing: 300
+name_match_threshold: 85
+name_match_buffer_size: 250
+priority: ["OVERTURE", "OSM", "UNICEF"]
 
 # Specify data download URLs
 iso_regional_codes: "https://raw.githubusercontent.com/lukes/ISO-3166-Countries-with-Regional-Codes/master/all/all.csv"
 overture_url: "s3://overturemaps-us-west-2/release/2023-07-26-alpha.0/theme=places/type=*/*"
 geoboundaries_url: "https://www.geoboundaries.org/api/current/gbOpen/"
-ghsl_url: "https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/GHSL/GHS_BUILT_C_GLOBE_R2023A/GHS_BUILT_C_FUN_E2018_GLOBE_R2023A_54009_10/V1-0/GHS_BUILT_C_FUN_E2018_GLOBE_R2023A_54009_10_V1_0.zip"
-ghsl_file: "global/GHS_BUILT_C_FUN_E2018_GLOBE_R2023A_54009_10_V1_0.tif"
-
-# Data cleaning
-buffer_size: 25
-school_buffer_size: 150
-ghsl_buffer_size: 150
-name_match_threshold: 85
-name_match_buffer_size: 250
-priority: ["OVERTURE", "OSM", "UNICEF"]
+microsoft_url: "https://minedbuildings.blob.core.windows.net/global-buildings/dataset-links.csv"
 
 # Specify school and non-school keywords
 school: {
@@ -31,7 +31,40 @@ school: {
         "university",
         "college",
         "institute",
-        "academy"
+        "academy",
+    ],
+    translated: [
+        "مدرسة",
+        "جامعة",
+        "أكاديمية",
+        "akadimiya",
+        "كلية",
+        "معهد",
+        "shule",
+        "chuo kikuu",
+        "chuo",
+        "akademia",
+        "makaranta",
+        "koleji",
+        "ile-iwe",
+        "ile-iwe giga",
+        "akademi",
+        "isikole",
+        "yunivesithi",
+        "ትምህርት ቤት",
+        "ዩኒቨርሲቲ",
+        "yuniversiti",
+        "iskuul",
+        "Jjamacad",
+        "skool",
+        "universiteit",
+        "akademie",
+        "kollege",
+        "école",
+        "université",
+        "collège",
+        "institut",
+        "académie",
     ]
 }
 non_school: {
@@ -225,8 +258,11 @@ exclude:
 - "Art"
 - "Nails"
 - "Infant"
+- "Pre"
 - "Pre-school"
 - "Preschool"
 - "Fitness"
 - "Sports"
-- "Pre"
+- "Music"
+- "Startup"
+- "Museum"
