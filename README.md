@@ -30,7 +30,7 @@ For each school and non-school location in our dataset, we downloaded 300 x 300 
 This repository is divided into the following files and folders:
 - **notebooks/**: contains all Jupyter notebooks for exploratory data analysis and model prediction.
 - **utils/**: contains utility methods for data cleaning, data visualization, model development, and model training routines.
-- **src/**: contains scripts runnable scripts for automated data cleaning and mode training/evaluation
+- **src/**: contains scripts runnable scripts for automated data cleaning and model training/evaluation.
 
 ## 💻 Usage
 
@@ -56,7 +56,12 @@ data
 ├── rasters
 │   ├── maxar
 │   │   ├── AIA
-│   │   │   ├── UNICEF-AIA-SCHOOL-00000001.tiff
+│   │   │   ├── school
+│   │   │   │    ├── UNICEF-AIA-SCHOOL-00000001.tiff
+│   │   │   │    └── ...
+│   │   │   ├── non_school
+│   │   │   │    ├── UNICEF-AIA-NON_SCHOOL-00000001.tiff
+│   │   │   │    └── ...
 │   │   │   └── ...
 │   │   └── ...
 └── vectors
@@ -80,4 +85,3 @@ data
     └── ...
 ```
 ## Acknowledgement
-Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
