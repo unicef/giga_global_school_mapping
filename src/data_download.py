@@ -30,7 +30,7 @@ def main():
     osm_nonschools = download_utils.download_osm(config, category="non_school")
 
     # Download Microsoft Building Footprints
-    download_utils.download_msf(config, verbose=True)
+    download_utils.download_ms(config, verbose=True)
     
 
 if __name__ == "__main__":

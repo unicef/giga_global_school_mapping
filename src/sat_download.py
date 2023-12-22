@@ -58,11 +58,11 @@ def download_sat_images(
         filename = os.path.join(cwd, vectors_dir, category, name, filename)
     data = gpd.read_file(filename).reset_index(drop=True)
 
-    if iso:
+    if 'iso' in data.columns:
         data = data[data["iso"] == iso].reset_index(drop=True)
     if sample_size:
         data = data.iloc[:sample_size]
-    data = data_utils._convert_to_crs(data, data.crs, config["SRS"])
+    data = data_utils._convert_crs(data, data.crs, config["SRS"])
     logging.info(f"Data dimensions: {data.shape}, CRS: {data.crs}")
 
     out_dir = os.path.join(cwd, config["RASTERS_DIR"], config["DIR"], iso, category)
