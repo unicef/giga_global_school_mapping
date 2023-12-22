@@ -48,6 +48,8 @@ def map_coordinates(
     zoom_start=18,
     max_zoom=20,
     name="validated",
+    id_col="UID",
+    name_col="name"
 ):
     """
     Generate and display a Folium map centered around the coordinates of a specific data point.
@@ -76,8 +78,8 @@ def map_coordinates(
 
     data = gpd.read_file(filename)
 
-    name = data.iloc[index]["name"]
-    logging.info(data.iloc[index]["UID"])
+    name = data.iloc[index][name_col]
+    logging.info(data.iloc[index][id_col])
     logging.info(name)
     if name:
         logging.info(ts.translate_text(name, translator="google"))
@@ -104,6 +106,7 @@ def validate_data(
     n_cols=4,
     filename=None,
     name="validated",
+    id_col="UID"
 ):
     """
     Perform data cleaning and provide an interactive widget for data inspection and validation.
@@ -157,7 +160,7 @@ def validate_data(
         """
         
         class_dir = os.path.join(cwd, image_dir, dir_, iso, category.lower())
-        filepath = os.path.join(class_dir, f"{item.UID}.tiff")
+        filepath = os.path.join(class_dir, f"{item[id_col]}.tiff")
         img = open(filepath, "rb").read()
         
         return Image(
@@ -242,6 +245,8 @@ def inspect_images(
     filename=None,
     random=False,
     name="validated",
+    id_col="UID",
+    name_col="name"
 ):
     """
     Visualizes image samples associated with geographic data for inspection.
@@ -289,7 +294,7 @@ def inspect_images(
     # Iterate over the samples to display associated images
     for idx, item in samples.iterrows():
         class_dir = os.path.join(cwd, image_dir, dir_, iso, category.lower())
-        filepath = os.path.join(class_dir, f"{item.UID}.tiff")
+        filepath = os.path.join(class_dir, f"{item[id_col]}.tiff")
 
         # Open and display the image on the subplot
         image = rio.open(filepath)
@@ -299,7 +304,7 @@ def inspect_images(
         )
         axes[row_index, col_index].set_axis_off()
         axes[row_index, col_index].set_title(
-            f"Index: {idx}\n{item.UID}\n{item['name']}", fontdict={"fontsize": 9}
+            f"Index: {idx}\n{item[id_col]}\n{item[name_col]}", fontdict={"fontsize": 9}
         )
 
         col_index += 1
