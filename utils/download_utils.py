@@ -1,3 +1,4 @@
+import re
 import os
 import time
 import duckdb
@@ -204,7 +205,7 @@ def download_overture(config, category, exclude=None, source="overture"):
         ]
     )
 
-    if exclude is not None:
+    if exclude:
         exclude_keywords = config[exclude]
         exclude_query = " and ".join(
             [
@@ -324,10 +325,9 @@ def _get_ms_country(config):
         country, _, _ = data_utils._get_iso_regions(config, iso_code)  
         max_score = 0
         for msf_country in msf_links.Location.unique():
-            score = 0.5*(
-                fuzz.partial_ratio(country, msf_country) 
-                + fuzz.token_set_ratio(country, msf_country)
-            )
+            msf_country_ = re.sub(r"(\w)([A-Z])", r"\1 \2", msf_country)
+            score = fuzz.partial_token_sort_ratio(country, msf_country_)
+                          
             if score > max_score:
                 max_score = score
                 matches[iso_code] = msf_country
@@ -336,7 +336,7 @@ def _get_ms_country(config):
 
 def download_ms(config, source="ms", verbose=False):
     """
-    Download and process Microsoft (MS) Building Footprints  data for specified ISO country codes.
+    Download and process Microsoft (MS) Building Footprints data for specified ISO country codes.
 
     Parameters:
     - config (dict): A dictionary containing configuration settings.
@@ -352,8 +352,11 @@ def download_ms(config, source="ms", verbose=False):
     This function uses leafmap and subprocess libraries for downloading MS buildings data,
     converting it to different formats, and storing it in specified directories.
     """
-    
-    matches = _get_ms_country(config)
+
+    if "ms_matches" in config:
+        matches = config["ms_matches"]
+    else:
+        matches = _get_ms_country(config)
     iso_codes = config["iso_codes"]
     
     for iso_code in (pbar := data_utils._create_progress_bar(iso_codes)):
@@ -371,7 +374,7 @@ def download_ms(config, source="ms", verbose=False):
         tif_dir = data_utils._makedir(os.path.join(config["rasters_dir"], f"{source}_buildings"))
         tif_file = str(os.path.join(tif_dir, f"{iso_code}_{source}.tif"))
     
-        if not os.path.exists(out_file_epsg3857) and not os.path.exists(tif_file):
+        if (not os.path.exists(out_file_epsg3857)) and (not os.path.exists(tif_file)):
             command1 = "ogr2ogr -s_srs EPSG:4326 -t_srs EPSG:3857 {} {}".format(
                 out_file_epsg3857,
                 out_file
@@ -382,5 +385,17 @@ def download_ms(config, source="ms", verbose=False):
                 tif_file
             )
             subprocess.Popen(f"{command1} && {command2}", shell=True)
+
+
+def download_ghsl(config):
+    ghsl_folder = os.path.join(config["rasters_dir"], "ghsl")
+    data_utils._makedir(ghsl_folder)
+    
+    ghsl_path = os.path.join(ghsl_folder, config["ghsl_file"])
+    ghsl_zip = os.path.join(ghsl_folder, "ghsl.zip")
+    if not os.path.exists(ghsl_path):
+        command1 = f"wget {config['ghsl_url']} -O {ghsl_zip}"
+        command3 = f"unzip {ghsl_zip} -d {ghsl_folder}"
+        subprocess.Popen(f"{command1} && {command2}", shell=True)
 
     
