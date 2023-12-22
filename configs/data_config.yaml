@@ -2,69 +2,67 @@ vectors_dir: 'data/vectors/'
 rasters_dir: 'data/rasters/'
 columns: ['UID', 'source', 'iso', 'country', 'region', 'subregion', 'name', 'geometry', 'giga_id_school']
 iso_codes: [
-    'YEM', 'SEN', 'MDG', 'AIA', 'ATG', 'BEN', 'BIH', 'BLZ', 'BRA', 'BRB', 
-    'BWA', 'CRI', 'DMA', 'GHA', 'GIN', 'GRD', 'HND', 'HUN', 'KAZ', 'KEN', 
-    'KIR', 'KNA', 'LCA', 'MNG', 'MSR', 'MWI', 'NAM', 'NER', 'NGA', 'PAN', 
-    'RWA', 'SLE', 'SLV', 'SSD', 'THA', 'TTO', 'UKR', 'UZB', 'VCT', 'VGB', 
-    'ZAF', 'ZWE'
+    'YEM', 'SEN', 'BWA', 'MDG', 'AIA', 'ATG', 'BEN', 'BIH', 'BLZ', 'BRB', 'CRI', 'DMA', 'GHA', 'GIN', 'GRD',
+    'HND', 'HUN', 'KAZ', 'KEN', 'KIR', 'KNA', 'LCA', 'MNG', 'MSR', 'MWI', 'NAM', 'NER', 'NGA', 'PAN', 'RWA', 
+    'SLE', 'SLV', 'SSD', 'THA', 'TTO', 'UKR', 'UZB', 'VCT', 'VGB', 'ZAF', 'ZWE', 'BRA'
 ]
 
 # Data cleaning
-buffer_size: 25
-school_buffer_size: 150
-layer_buffer_size: 150
-non_school_spacing: 300
+proximity: 50
+filter_buffer_size: 150
+neg_sample_spacing: 300
+pos_object_proximity: 300
 name_match_threshold: 85
-name_match_buffer_size: 250
+name_match_proximity: 200
 priority: ["OVERTURE", "OSM", "UNICEF"]
 
 # Specify data download URLs
 iso_regional_codes: "https://raw.githubusercontent.com/lukes/ISO-3166-Countries-with-Regional-Codes/master/all/all.csv"
 overture_url: "s3://overturemaps-us-west-2/release/2023-07-26-alpha.0/theme=places/type=*/*"
-geoboundaries_url: "https://www.geoboundaries.org/api/current/gbOpen/"
+gbhumanitarian_url: "https://www.geoboundaries.org/api/current/gbHumanitarian/"
+gbopen_url: "https://www.geoboundaries.org/api/current/gbOpen/"
 microsoft_url: "https://minedbuildings.blob.core.windows.net/global-buildings/dataset-links.csv"
+ghsl_url: "https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/GHSL/GHS_BUILT_C_GLOBE_R2023A/GHS_BUILT_C_FUN_E2018_GLOBE_R2023A_54009_10/V1-0/GHS_BUILT_C_FUN_E2018_GLOBE_R2023A_54009_10_V1_0.zip"
+ghsl_file: "GHS_BUILT_C_FUN_E2018_GLOBE_R2023A_54009_10_V1_0.tif"
+
 
 # Specify school and non-school keywords
 school: {
     amenity: [
         "school",
-        "university",
-        "college",
-        "institute",
-        "academy",
+        "academy"
     ],
     translated: [
         "مدرسة",
-        "جامعة",
+        "مدرسة",
         "أكاديمية",
         "akadimiya",
-        "كلية",
-        "معهد",
         "shule",
-        "chuo kikuu",
-        "chuo",
         "akademia",
         "makaranta",
-        "koleji",
         "ile-iwe",
         "ile-iwe giga",
         "akademi",
         "isikole",
-        "yunivesithi",
         "ትምህርት ቤት",
-        "ዩኒቨርሲቲ",
-        "yuniversiti",
         "iskuul",
-        "Jjamacad",
         "skool",
-        "universiteit",
         "akademie",
-        "kollege",
         "école",
-        "université",
-        "collège",
-        "institut",
         "académie",
+        "escuela",
+        "escola",
+        "мектеп",
+        "am-pianarana",
+        "maktab",
+        "škola",
+        "школа",
+        "iskola",
+        "сургууль",
+        "ishuri",
+        "โรงเรียน",
+        "chikoro",
+        "isikolo"
     ]
 }
 non_school: {
@@ -250,13 +248,16 @@ exclude:
 - "Bikeride"
 - "Basketball"
 - "Taekwondo"
+- "Football"
 - "Tennis"
 - "Beauty"
 - "Cosmetics"
+- "Nursery"
 - "Makeup"
 - "Salon"
 - "Art"
 - "Nails"
+- "Tattoo"
 - "Infant"
 - "Pre"
 - "Pre-school"
@@ -266,3 +267,89 @@ exclude:
 - "Music"
 - "Startup"
 - "Museum"
+- "Coding"
+- "Code"
+- "Kinder"
+- "Kindergarten"
+- "Baby"
+- "University"
+- "College"
+- "Business"
+- "Professional"
+- "Professionnelle"
+- "Medicine"
+- "Management"
+- "Combat"
+- "Medical"
+- "Language"
+- "English"
+- "Yunivesithi"
+- "جامعة"
+- "كلية"
+- "Chuo kikuu"
+- "Chuo"
+- "Koleji"
+- "ዩኒቨርሲቲ"
+- "Yuniversiti"
+- "Universiteit"
+- "Kollege"
+- "Université"
+- "Collège"
+- "Collége"
+- "Aviation"
+- "Martial Arts"
+- "Bilingue"
+- "Bilingual"
+- "Technical"
+- "Institute"
+- "Institut"
+- "Institution"
+- "Tutor"
+- "Tutors"
+- "Bookstore"
+- "Supplies"
+
+ms_matches: {
+ 'YEM': 'RepublicofYemen',
+ 'SEN': 'Senegal',
+ 'MDG': 'Madagascar',
+ 'AIA': 'Anguilla',
+ 'ATG': 'AntiguaandBarbuda',
+ 'BEN': 'Benin',
+ 'BIH': 'BosniaandHerzegovina',
+ 'BLZ': 'Belize',
+ 'BRB': 'Barbados',
+ 'BWA': 'Botswana',
+ 'CRI': 'CostaRica',
+ 'DMA': 'Dominica',
+ 'GHA': 'Ghana',
+ 'GIN': 'EquatorialGuinea',
+ 'GRD': 'Grenada',
+ 'HND': 'Honduras',
+ 'HUN': 'Hungary',
+ 'KAZ': 'Kazakhstan',
+ 'KEN': 'Kenya',
+ 'KIR': 'Kiribati',
+ 'KNA': 'StKittsandNevis',
+ 'LCA': 'SaintLucia',
+ 'MNG': 'Mongolia',
+ 'MSR': 'Montserrat',
+ 'MWI': 'Malawi',
+ 'NAM': 'Namibia',
+ 'NER': 'Niger',
+ 'NGA': 'Nigeria',
+ 'PAN': 'Panama',
+ 'RWA': 'Rwanda',
+ 'SLE': 'SierraLeone',
+ 'SLV': 'ElSalvador',
+ 'SSD': 'SouthSudan',
+ 'THA': 'Thailand',
+ 'TTO': 'TrinidadandTobago',
+ 'UKR': 'Ukraine',
+ 'UZB': 'Uzbekistan',
+ 'VCT': 'Grenada',
+ 'VGB': 'BritishVirginIslands',
+ 'ZAF': 'SouthAfrica',
+ 'ZWE': 'Zimbabwe',
+ 'BRA': 'Brazil'
+}

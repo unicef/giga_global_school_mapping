@@ -75,13 +75,12 @@ data
     │   ├── overture
     │   │   ├──AIA_overture.geojson
     │   │   └── ...
-    ├── non_school
-    │   ├── osm
-    │   │   ├──AIA_osm.geojson
-    │   │   └── ...
-    │   ├── overture
-    │   │   ├──AIA_overture.geojson
-    │   │   └── ...
-    └── ...
+    └── non_school
+        ├── osm
+        │   ├──AIA_osm.geojson
+        │   └── ...
+        └── overture
+            ├──AIA_overture.geojson
+            └── ...
+    
 ```
-## Acknowledgement

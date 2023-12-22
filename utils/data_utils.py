@@ -11,9 +11,26 @@ import geopandas as gpd
 
 from tqdm import tqdm
 from pyproj import Proj, Transformer
+from scipy.sparse.csgraph import connected_components
 
 pd.options.mode.chained_assignment = None
 logging.basicConfig(level=logging.INFO)
+
+
+def _clean_text(text):
+    """
+    Cleans the text by removing all non-word characters and converting to uppercase.
+
+    Args:
+    - text (str): Text to be cleaned.
+
+    Returns:
+    - str: Cleaned text with non-word characters removed and converted to uppercase.
+    """
+
+    if text:
+        return re.sub(r"[^\w\s]", "", text).upper()
+    return text
 
 
 def _create_progress_bar(items):
@@ -72,7 +89,7 @@ def _get_iso_regions(config, iso_code):
     return country, subregion, region
 
 
-def _convert_to_crs(data, src_crs="EPSG:4326", target_crs="EPSG:3857"):
+def _convert_crs(data, src_crs="EPSG:4326", target_crs="EPSG:3857"):
     """
     Converts a GeoDataFrame to a different Coordinate Reference System (CRS).
 
@@ -168,14 +185,14 @@ def _prepare_data(config, data, iso_code, category, source, columns, out_file=No
 
     data["source"] = source.upper()
     data = data.drop_duplicates("geometry", keep="first")
-    country, region, subregion = _get_iso_regions(config, data, iso_code)
+    country, region, subregion = _get_iso_regions(config, iso_code)
     data["iso"] = iso_code
     data["country"] = country
     data["subregion"] = region
     data["region"] = subregion
     
-    
-    data = _generate_uid(data, category)
+    if len(data) > 0:
+        data = _generate_uid(data, category)
     data = data[columns]
 
     if out_file:
@@ -205,11 +222,11 @@ def _get_geoboundaries(config, iso_code, out_dir=None, adm_level="ADM0"):
         out_dir = _makedir(out_dir)
 
     try:
-        url = f"{config['geoboundaries_url']}{iso_code}/{adm_level}/"
+        url = f"{config['gbhumanitarian_url']}{iso_code}/{adm_level}/"
         r = requests.get(url)
         download_path = r.json()["gjDownloadURL"]
     except:
-        url = f"{config['geoboundaries_url']}{iso_code}/ADM0/"
+        url = f"{config['gbopen_url']}{iso_code}/ADM0/"
         r = requests.get(url)
         download_path = r.json()["gjDownloadURL"]
 
@@ -254,7 +271,51 @@ def _read_data(data_dir, exclude=[]):
     return data
 
 
-def get_counts(config, column='iso', categories=["school", "non_school"]):
+def _connect_components(data, buffer_size):
+    """
+    Connects components within a specified buffer size.
+    Dissolve overlapping geometries based on: https://gis.stackexchange.com/a/271737
+
+    Args:
+    - data (DataFrame): DataFrame containing geometries to connect.
+    - buffer_size (float): Buffer size for connecting geometries in meters.
+
+    Returns:
+    - DataFrame: DataFrame with connected components marked by a 'group' column.
+    """
+
+    temp = data.copy()
+    if data.crs != "EPSG:3857":
+        temp = _convert_crs(data, target_crs="EPSG:3857")
+    geometry = temp["geometry"].buffer(buffer_size, cap_style=3)
+    overlap_matrix = geometry.apply(lambda x: geometry.overlaps(x)).values.astype(int)
+    n, groups = connected_components(overlap_matrix, directed=False)
+    data["group"] = groups
+    return data
+
+
+def _drop_duplicates(data, priority):
+    """
+    Drops duplicate rows based on specified priority.
+
+    Args:
+    - data (DataFrame): DataFrame containing rows to check for duplicates.
+    - priority (list): Priority for filtering duplicates. 
+        An example of a priority list is: ["OVERTURE", "OSM", "UNICEF"]
+
+    Returns:
+    - DataFrame: DataFrame after dropping duplicates based on the specified priority.
+    """
+
+    data["temp_source"] = pd.Categorical(
+        data["source"], categories=priority, ordered=True
+    )
+    data = data.sort_values("temp_source", ascending=True).drop_duplicates(["group"])
+    data = data.reset_index(drop=True)
+    return data
+
+
+def get_counts(config, column='iso', categories=["school", "non_school"], src="unicef"):
     """
     Retrieves the counts of specified categories based on a given column in the GeoJSON layers.
 
@@ -270,6 +331,8 @@ def get_counts(config, column='iso', categories=["school", "non_school"]):
     
     cwd = os.path.dirname(os.getcwd())
     data = {category: [] for category in categories}
+    if src:
+        data[src] = []
     
     iso_codes = config["iso_codes"]
     for iso_code in (pbar := _create_progress_bar(iso_codes)):
@@ -289,9 +352,16 @@ def get_counts(config, column='iso', categories=["school", "non_school"]):
                 
             data[category].append(subdata)
 
-    for category in categories:
-        data[category] = pd.concat(data[category])
-    
+            if category == categories[0] and src != None:
+                filepath = os.path.join(dir, src, f"{iso_code}_school_geolocation_coverage_master.csv")
+                if os.path.exists(filepath):
+                    subdata = pd.read_csv(filepath, low_memory=False)
+                    subdata[column] = iso_code
+                    data[src].append(subdata)
+
+    for key, values in data.items():
+        data[key] = pd.concat(values)
+
     counts = pd.merge(
         data[categories[0]][column].value_counts(), 
         data[categories[1]][column].value_counts(), 
@@ -299,5 +369,14 @@ def get_counts(config, column='iso', categories=["school", "non_school"]):
         right_index=True
     )
     counts.columns = categories
+    
+    if src:
+        counts = pd.merge(
+            counts,
+            data[src][column].value_counts(), 
+            left_index=True, 
+            right_index=True
+        )
+        counts.columns = categories + [src]
     return counts
     
