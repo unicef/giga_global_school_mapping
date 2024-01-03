@@ -117,7 +117,7 @@ def _convert_crs(data, src_crs="EPSG:4326", target_crs="EPSG:3857"):
     return data
 
 
-def _concat_data(data, out_file=None, verbose=True):
+def _concat_data(data, out_file=None, verbose=False):
     """
     Concatenates a list of datasets and converts it to a GeoDataFrame.
 
@@ -242,7 +242,7 @@ def _get_geoboundaries(config, iso_code, out_dir=None, adm_level="ADM0"):
     return geoboundary
 
 
-def _read_data(data_dir, exclude=[]):
+def read_data(data_dir, exclude=[]):
     """
     Reads and concatenates data from a directory of files.
 
@@ -315,7 +315,7 @@ def _drop_duplicates(data, priority):
     return data
 
 
-def get_counts(config, column='iso', categories=["school", "non_school"], src="unicef"):
+def get_counts(config, column='iso', layer="clean"):
     """
     Retrieves the counts of specified categories based on a given column in the GeoJSON layers.
 
@@ -330,34 +330,21 @@ def get_counts(config, column='iso', categories=["school", "non_school"], src="u
     """
     
     cwd = os.path.dirname(os.getcwd())
+    categories = [config["pos_category"], config["neg_category"]]
     data = {category: [] for category in categories}
-    if src:
-        data[src] = []
     
     iso_codes = config["iso_codes"]
     for iso_code in (pbar := _create_progress_bar(iso_codes)):
         pbar.set_description(f"Reading {iso_code}")
         for category in categories:
             dir = os.path.join(cwd, config['vectors_dir'], category)
-
-            layer = "validated"
-            filepath = os.path.join(dir, layer, "{iso_code}_{layer}.geojson")
-            if not os.path.isfile(filepath):
-                layer = "clean"
-                filepath = os.path.join(dir, layer, f"{iso_code}_{layer}.geojson")
-                
+            filepath = os.path.join(dir, layer, f"{iso_code}_{layer}.geojson")
             subdata = gpd.read_file(filepath)
-            if layer == "validated":
-                subdata = subdata[subdata[layer] == 0]
-                
+            if "clean" in subdata.columns:
+                subdata = subdata[subdata["clean"] == 0]
+            if "validated" in subdata.columns:
+                subdata = subdata[subdata["validated"] == 0]
             data[category].append(subdata)
-
-            if category == categories[0] and src != None:
-                filepath = os.path.join(dir, src, f"{iso_code}_school_geolocation_coverage_master.csv")
-                if os.path.exists(filepath):
-                    subdata = pd.read_csv(filepath, low_memory=False)
-                    subdata[column] = iso_code
-                    data[src].append(subdata)
 
     for key, values in data.items():
         data[key] = pd.concat(values)
@@ -370,13 +357,5 @@ def get_counts(config, column='iso', categories=["school", "non_school"], src="u
     )
     counts.columns = categories
     
-    if src:
-        counts = pd.merge(
-            counts,
-            data[src][column].value_counts(), 
-            left_index=True, 
-            right_index=True
-        )
-        counts.columns = categories + [src]
     return counts
     
