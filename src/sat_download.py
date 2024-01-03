@@ -57,6 +57,11 @@ def download_sat_images(
         filename = f"{iso}_{name}.geojson"
         filename = os.path.join(cwd, vectors_dir, category, name, filename)
     data = gpd.read_file(filename).reset_index(drop=True)
+    
+    if "clean" in data.columns:
+        data = data[data["clean"] == 0]
+    if "validated" in data.columns:
+        data = data[data["validated"] == 0]
 
     if 'iso' in data.columns:
         data = data[data["iso"] == iso].reset_index(drop=True)
