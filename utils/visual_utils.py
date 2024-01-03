@@ -47,7 +47,7 @@ def map_coordinates(
     filename=None,
     zoom_start=18,
     max_zoom=20,
-    name="validated",
+    name="clean",
     id_col="UID",
     name_col="name"
 ):
@@ -70,16 +70,12 @@ def map_coordinates(
     
     cwd = os.path.dirname(os.getcwd())
     vector_dir = config["VECTORS_DIR"]
-
-    if not filename:
-        filename = _get_filename(cwd, iso, vector_dir, category, name)
-        if not os.path.exists(filename):
-            filename = _get_filename(cwd, iso, vector_dir, category, "clean")
-
+    
+    filename = _get_filename(cwd, iso, vector_dir, category, "clean")
     data = gpd.read_file(filename)
 
-    name = data.iloc[index][name_col]
-    logging.info(data.iloc[index][id_col])
+    name = data[data.index == index].iloc[0][name_col]
+    logging.info(data[data.index == index].iloc[0][id_col])
     logging.info(name)
     if name:
         logging.info(ts.translate_text(name, translator="google"))
@@ -105,7 +101,7 @@ def validate_data(
     n_rows=4,
     n_cols=4,
     filename=None,
-    name="validated",
+    name="clean",
     id_col="UID"
 ):
     """
@@ -133,18 +129,14 @@ def validate_data(
 
     if not filename:
         filename = _get_filename(cwd, iso, vector_dir, category, name)
-        if not os.path.exists(filename):
-            data = gpd.read_file(_get_filename(cwd, iso, vector_dir, category, "clean"))
-            data["index"] = data.index
-            data[name] = 0
-            dir = os.path.dirname(filename)
-            if not os.path.exists(dir):
-                os.makedirs(dir)
-            data.to_file(filename, driver="GeoJSON")
-        else:
-            data = gpd.read_file(filename)
-
-    samples = data.iloc[start_index : start_index + (n_rows * n_cols)]
+    data = gpd.read_file(filename)
+    
+    if 'validated' not in data.columns:
+        data["validated"] = 0
+        
+    samples = data[(data['clean'] == 0)] # & (data['validated'] == 0)]
+    samples = samples.iloc[start_index : start_index + (n_rows * n_cols)]
+    
     grid = GridspecLayout(n_rows * row_inc + n_rows, n_cols)
     button_dict = {0: ("primary", category), -1: ("warning", "unrecognized")}
 
@@ -186,14 +178,14 @@ def validate_data(
         item = data.iloc[index]
 
         change_value = -1
-        if item[name] == -1:
+        if item["validated"] == -1:
             change_value = 0
         button_style, category = button_dict[change_value]
 
         button.button_style = button_style
         button.description = f"{item.name} {category.upper()}"
 
-        data.loc[index, name] = change_value
+        data.loc[index, "validated"] = change_value
         data.to_file(filename, driver="GeoJSON")
 
     def _create_button(item):
@@ -207,7 +199,7 @@ def validate_data(
         - Button: A Button widget with specified properties.
         """
         
-        val = item[name]
+        val = item["validated"]
         button_style, category = button_dict[val]
         description = f"{item.name} {category.upper()}"
 
@@ -241,12 +233,11 @@ def inspect_images(
     n_rows=4,
     n_cols=4,
     start_index=0,
-    figsize=(15, 15),
     filename=None,
     random=False,
-    name="validated",
     id_col="UID",
-    name_col="name"
+    name_col="name",
+    figsize=(15, 15)
 ):
     """
     Visualizes image samples associated with geographic data for inspection.
@@ -271,20 +262,18 @@ def inspect_images(
     vector_dir = config["VECTORS_DIR"]
     dir_ = config["DIR"]
 
-    # If filename not provided, load validated data
     if not filename:
-        filename = _get_filename(cwd, iso, vector_dir, category, name)
-        # If the validated file does not exist, load clean data instead
-        if not os.path.exists(filename):
-            filename = _get_filename(cwd, iso, vector_dir, category, "clean")
+        filename = _get_filename(cwd, iso, vector_dir, category, "clean")
 
     # Load geographic data from the file
     data = gpd.read_file(filename)
     if random:
         data = data.sample(frac=1.0)
-    # Filter data if the specified name column exists
-    if name in data.columns:
-        data = data[data[name] > -1]
+    if "clean" in data.columns:
+        data = data[data["clean"] == 0]
+    if "validated" in data.columns:
+        data = data[data["validated"] == 0]
+    logging.info(f"Data dimensions: {data.shape}")
 
     # Create a grid of subplots for visualizing images
     fig, axes = plt.subplots(n_rows, n_cols, figsize=figsize)

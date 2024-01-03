@@ -27,3 +27,21 @@ def create_config(config_file, prefix=""):
             if len(prefix) > 0:
                 cfg[k] = prefix + cfg[k]
     return cfg
+
+def load_config(config_file_exp, prefix=""):
+    """Loads configuration files with system configurations included.
+
+    Args:
+        config_file_exp (str): Path to the experiment-specific configuration file.
+        prefix (str): Prefix to be added to file paths in the configuration.
+
+    Returns:
+        dict: The loaded configuration as a dictionary.
+    """
+    cwd = os.path.dirname(os.getcwd())
+    sys_config_file = f"{cwd}/configs/config.yaml"
+    sys_config = create_config(sys_config_file, prefix=prefix)
+    config = create_config(config_file_exp, prefix=prefix)
+    config.update(sys_config)
+    
+    return config
