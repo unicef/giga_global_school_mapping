@@ -8,9 +8,7 @@ from tqdm import tqdm
 
 import pandas as pd
 import geopandas as gpd
-
 from owslib.wms import WebMapService
-
 import sys
 
 sys.path.insert(0, "../utils/")
@@ -31,6 +29,7 @@ def download_sat_images(
     id_col="UID",
     name="clean",
     filename=None,
+    download_validated=False
 ):
     """
     Downloads satellite images based on geographic data points.
@@ -51,7 +50,7 @@ def download_sat_images(
     """
     
     cwd = os.path.dirname(os.getcwd())
-    vectors_dir = config["VECTORS_DIR"]
+    vectors_dir = config["vectors_dir"]
 
     if not filename:
         filename = f"{iso}_{name}.geojson"
@@ -60,42 +59,42 @@ def download_sat_images(
     
     if "clean" in data.columns:
         data = data[data["clean"] == 0]
-    if "validated" in data.columns:
+    if "validated" in data.columns and not download_validated:
         data = data[data["validated"] == 0]
 
     if 'iso' in data.columns:
         data = data[data["iso"] == iso].reset_index(drop=True)
     if sample_size:
         data = data.iloc[:sample_size]
-    data = data_utils._convert_crs(data, data.crs, config["SRS"])
+    data = data_utils._convert_crs(data, data.crs, config["srs"])
     logging.info(f"Data dimensions: {data.shape}, CRS: {data.crs}")
 
-    out_dir = os.path.join(cwd, config["RASTERS_DIR"], config["DIR"], iso, category)
+    out_dir = os.path.join(cwd, config["rasters_dir"], config["maxar_dir"], iso, category)
     out_dir = data_utils._makedir(out_dir)
 
-    url = f"{config['DIGITALGLOBE_URL']}connectid={creds['CONNECT_ID']}"
-    wms = WebMapService(url, username=creds["USERNAME"], password=creds["PASSWORD"])
+    url = f"{config['digitalglobe_url']}connectid={creds['connect_id']}"
+    wms = WebMapService(url, username=creds["username"], password=creds["password"])
 
     bar_format = "{l_bar}{bar:20}{r_bar}{bar:-20b}"
     for index in tqdm(range(len(data)), bar_format=bar_format):
         image_file = os.path.join(out_dir, f"{data[id_col][index]}.tiff")
         if not os.path.exists(image_file):
             bbox = (
-                data.lon[index] - config["SIZE"],
-                data.lat[index] - config["SIZE"],
-                data.lon[index] + config["SIZE"],
-                data.lat[index] + config["SIZE"],
+                data.lon[index] - config["size"],
+                data.lat[index] - config["size"],
+                data.lon[index] + config["size"],
+                data.lat[index] + config["size"],
             )
             img = wms.getmap(
                 bbox=bbox,
-                layers=config["LAYERS"],
-                srs=config["SRS"],
-                size=(config["WIDTH"], config["HEIGHT"]),
-                featureProfile=config["FEATUREPROFILE"],
-                coverage_cql_filter=config["COVERAGE_CQL_FILTER"],
-                exceptions=config["EXCEPTIONS"],
-                transparent=config["TRANSPARENT"],
-                format=config["FORMAT"],
+                layers=config["layers"],
+                srs=config["srs"],
+                size=(config["width"], config["height"]),
+                featureProfile=config["featureprofile"],
+                coverage_cql_filter=config["coverage_cql_filter"],
+                exceptions=config["exceptions"],
+                transparent=config["transparent"],
+                format=config["format"],
             )
             with open(image_file, "wb") as file:
                 file.write(img.read())
@@ -103,19 +102,20 @@ def download_sat_images(
 
 def main():
     # Parser
-    logging.basicConfig(level=logging.INFO)
     parser = argparse.ArgumentParser(description="Satellite Image Download")
     parser.add_argument("--config", help="Config file")
     parser.add_argument("--creds", help="Credentials file")
-    parser.add_argument("--filename", help="Data file")
+    parser.add_argument("--category", help="Category (e.g. school or non_school)")
+    parser.add_argument("--iso", help="ISO code")
+    parser.add_argument("--filename", help="Data file", default=None)
     args = parser.parse_args()
 
     # Load config
-    config = config_utils.create_config(args.config)
+    config = config_utils.load_config(args.config)
     creds = config_utils.create_config(args.creds)
 
     # Download satellite images
-    download_images(args.filename, creds, config)
+    download_images(creds, config, iso=args.iso, category=args.category, filename=args.filename)
 
 
 if __name__ == "__main__":
