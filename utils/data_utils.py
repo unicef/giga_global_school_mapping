@@ -80,7 +80,7 @@ def _get_iso_regions(config, iso_code):
     """
 
     # Load ISO codes of countries and regions/subregions
-    codes = pd.read_csv(config["iso_regional_codes"])
+    codes = pd.read_csv(config["iso_codes_url"])
     subcode = codes.query(f"`alpha-3` == '{iso_code}'")
     country = subcode["name"].values[0]
     subregion = subcode["sub-region"].values[0]
@@ -330,7 +330,7 @@ def get_counts(config, column='iso', layer="clean"):
     """
     
     cwd = os.path.dirname(os.getcwd())
-    categories = [config["pos_category"], config["neg_category"]]
+    categories = [config["pos_class"], config["neg_class"]]
     data = {category: [] for category in categories}
     
     iso_codes = config["iso_codes"]

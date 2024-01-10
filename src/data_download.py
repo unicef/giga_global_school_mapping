@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import geopandas as gpd
+import argparse
 
 import sys
 sys.path.insert(0, "../utils/")
@@ -12,12 +13,7 @@ warnings.filterwarnings("ignore")
 warnings.simplefilter("ignore")
 
 
-def main():
-    # Load config file
-    cwd = os.path.dirname(os.getcwd())
-    config_file = os.path.join(cwd, "configs/data_config.yaml")
-    config = config_utils.create_config(config_file)
-
+def download_data(config):
     # Load UNICEF data
     unicef = download_utils.load_unicef(config)
 
@@ -31,6 +27,19 @@ def main():
 
     # Download Microsoft Building Footprints
     download_utils.download_ms(config, verbose=True)
+    
+
+def main():
+    parser = argparse.ArgumentParser(description="Satellite Image Download")
+    parser.add_argument("--config", help="Config file")
+    args = parser.parse_args()
+    
+    # Load config file
+    cwd = os.path.dirname(os.getcwd())
+    config_file = os.path.join(cwd, args.config)
+    config = config_utils.create_config(config_file)
+
+    download_data(config)
     
 
 if __name__ == "__main__":

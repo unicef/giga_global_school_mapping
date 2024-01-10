@@ -1,17 +1,13 @@
-DIGITALGLOBE_URL: "https://evwhs.digitalglobe.com/mapservice/wmsaccess?"
-RASTERS_DIR: 'data/rasters/'
-VECTORS_DIR: 'data/vectors/'
-DIR: 'maxar/500x500_60cm'
-SIZE: 150
-WIDTH: 500
-HEIGHT: 500
-SRS: 'EPSG:3857'
-STYLES: ''
-TRANSPARENT: True
-REQUEST: 'GetMap'
-FORMAT: 'image/png'
-LAYERS: ['DigitalGlobe:Imagery']
-EXCEPTIONS: 'application/vnd.ogc.se_xml'
-FEATUREPROFILE: 'Most_Aesthetic_Mosaic_Profile'
-COVERAGE_CQL_FILTER: 'productType =%27Pan Sharpened Natural Color%27'
-COVERAGE_CQL_FILTER: ''
+digitalglobe_url: "https://evwhs.digitalglobe.com/mapservice/wmsaccess?"
+size: 150
+width: 500
+height: 500
+srs: 'EPSG:3857'
+styles: ''
+transparent: True
+request: 'GetMap'
+format: 'image/png'
+layers: ['DigitalGlobe:Imagery']
+exceptions: 'application/vnd.ogc.se_xml'
+featureprofile: 'Most_Aesthetic_Mosaic_Profile'
+coverage_cql_filter: 'productType =%27Pan Sharpened Natural Color%27'

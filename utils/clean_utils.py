@@ -69,7 +69,7 @@ def _generate_additional_negative_samples(
     # Read positive data and perform buffer operation on geometries
     filename = f"{iso_code}_{sname}.geojson"
     vector_dir = os.path.join(cwd, config["vectors_dir"])
-    pos_file = os.path.join(vector_dir, config["pos_category"], sname, filename)
+    pos_file = os.path.join(vector_dir, config["pos_class"], sname, filename)
     pos_df = gpd.read_file(pos_file).to_crs("EPSG:3857")
     
     pos_df["geometry"] = pos_df["geometry"].buffer(buffer_size, cap_style=3)
@@ -96,7 +96,7 @@ def _generate_additional_negative_samples(
         with rio.open(ms_path) as src:
             points['ms_val'] = [x[0] for x in src.sample(ms_coord_list)]
 
-    ghsl_path = os.path.join(raster_dir, "ghsl", config["ghsl_file"])
+    ghsl_path = os.path.join(raster_dir, "ghsl", config["ghsl_built_c_file"])
     with rio.open(ghsl_path) as src:
         col_val = 'ghsl_val'  if 'ms_val' in points.columns else 'pixel_val'
         points[col_val]  = [x[0] for x in src.sample(ghsl_coord_list)]
@@ -140,34 +140,39 @@ def _augment_negative_samples(config, sname="clean"):
         neg_file = os.path.join(
             cwd, 
             config["vectors_dir"], 
-            config["neg_category"], 
+            config["neg_class"], 
             sname, 
             f"{iso_code}_{sname}.geojson"
         )
         negatives = gpd.read_file(neg_file)
 
-        n_pos = subdata[config["pos_category"]].iloc[0]
-        n_neg = subdata[config["neg_category"]].iloc[0]
+        n_pos = subdata[config["pos_class"]].iloc[0]
+        n_neg = subdata[config["neg_class"]].iloc[0]
+        
         if n_pos > n_neg:
             buffer_size = config["object_proximity"]/2
             spacing = config["sample_spacing"]
             points = _generate_additional_negative_samples(
                 config, iso_code, buffer_size, spacing=spacing, sname=sname
             )
+            
             points = data_utils._prepare_data(
                 config=config,
                 data=points,
                 iso_code=iso_code,
-                category=config["neg_category"],
+                category=config["neg_class"],
                 source='AUG',
                 columns=config["columns"]
             )
+            
             if "clean" in negatives.columns:
                 points["clean"] = 0
             if "validated" in negatives.columns:
                 points["validated"] = 0
+                
             logging.info(f"{iso_code} {points.shape} {n_pos - n_neg}")
             points = points.sample((n_pos - n_neg), random_state=SEED)
+            
             negatives = data_utils._concat_data(
                 [points, negatives], 
                 neg_file,
@@ -177,8 +182,9 @@ def _augment_negative_samples(config, sname="clean"):
 
     # Save combined dataset
     vector_dir = os.path.join(cwd, config["vectors_dir"])
-    out_file = os.path.join(vector_dir, config["neg_category"], f"{sname}.geojson")
+    out_file = os.path.join(vector_dir, config["neg_class"], f"{sname}.geojson")
     data = data_utils._concat_data(data, out_file)
+    
     return data
 
 
@@ -245,7 +251,7 @@ def _filter_uninhabited_locations(data, config, pbar):
     # Generate file paths based on the iso_code and source
     raster_dir = os.path.join(cwd, config["rasters_dir"])
     src_path = os.path.join(raster_dir, "ms_buildings", f"{iso_code}_ms.tif")
-    ghsl_path = os.path.join(raster_dir, "ghsl", config["ghsl_file"])
+    ghsl_path = os.path.join(raster_dir, "ghsl", config["ghsl_built_c_file"])
     if not os.path.exists(src_path):
         src_path = ghsl_path
 
@@ -291,12 +297,7 @@ def _filter_uninhabited_locations(data, config, pbar):
     return data
 
 
-def _filter_pois_within_object_proximity(
-    config, 
-    proximity, 
-    sname="clean", 
-    name="filtered"
-):
+def _filter_pois_within_object_proximity(config, proximity, sname="clean"):
     """
     Filters points of interest (POIs) located within proximity of positive objects (e.g. schools).
 
@@ -304,7 +305,6 @@ def _filter_pois_within_object_proximity(
     - config (dict): Configuration settings.
     - proximity (float): Max proximity of objects (in meters) to be grouped.
     - sname (str, optional): Name of the dataset. Defaults to "clean".
-    - name (str, optional): Name for the filtered output. Defaults to "filtered".
 
     Returns:
     - GeoDataFrame: Processed and filtered GeoDataFrame containing non-school POIs.
@@ -315,52 +315,43 @@ def _filter_pois_within_object_proximity(
     data_dir = config["vectors_dir"]
 
     # Set up directories and configurations
-    out_dir = data_utils._makedir(os.path.join(data_dir, config["neg_category"], name))
-    neg_dir = os.path.join(data_dir, config["neg_category"])
-    exclude = [f"{sname}.geojson", f"{name}.geojson"]
-    negatives = data_utils.read_data(neg_dir, exclude=exclude)
+    neg_dir = os.path.join(data_dir, config["neg_class"])
+    negatives = data_utils.read_data(neg_dir, exclude=[f"{sname}.geojson"])
 
     data = []
     # Iterate over ISO codes to process data
     for iso_code in (pbar := data_utils._create_progress_bar(config["iso_codes"])):
+        pbar.set_description(f"Processing {iso_code}")
+        
         filename = f"{iso_code}_{sname}.geojson"
-        pos_file = os.path.join(cwd, data_dir, config["pos_category"], sname, filename)
+        pos_file = os.path.join(cwd, data_dir, config["pos_class"], sname, filename)
         positives = gpd.read_file(pos_file)
         if "clean" in positives.columns:
             positives = positives[positives["clean"] == 0]
         if "validated" in positives.columns:
             positives = positives[positives["validated"] == 0]
 
-        pbar.set_description(f"Processing {iso_code}")
-        out_subfile = os.path.join(out_dir, f"{iso_code}_{name}.geojson")
+        # Filter non-school POIs within the buffer of school locations
+        pos_sub = positives[positives["iso"] == iso_code]
+        neg_sub = negatives[negatives["iso"] == iso_code]
 
-        if not os.path.exists(out_subfile):
-            # Filter non-school POIs within the buffer of school locations
-            pos_sub = positives[positives["iso"] == iso_code]
-            neg_sub = negatives[negatives["iso"] == iso_code]
+        # Convert school and non-school data CRS to EPSG:3857
+        neg_temp = data_utils._convert_crs(neg_sub, target_crs="EPSG:3857")
+        neg_temp["geometry"] = neg_temp["geometry"].buffer(proximity/2, cap_style=3)
+        neg_temp["index"] = neg_sub.index
+        pos_temp = data_utils._convert_crs(pos_sub, target_crs="EPSG:3857")
+        pos_temp["geometry"] = pos_temp["geometry"].buffer(proximity/2, cap_style=3)
 
-            # Convert school and non-school data CRS to EPSG:3857
-            neg_temp = data_utils._convert_crs(neg_sub, target_crs="EPSG:3857")
-            neg_temp["geometry"] = neg_temp["geometry"].buffer(proximity/2, cap_style=3)
-            neg_temp["index"] = neg_sub.index
-            pos_temp = data_utils._convert_crs(pos_sub, target_crs="EPSG:3857")
-            pos_temp["geometry"] = pos_temp["geometry"].buffer(proximity/2, cap_style=3)
+        # Filter out non-school POIs that intersect with buffered school locations
+        intersecting = pos_temp.sjoin(neg_temp, how="inner")["index"]
+        neg_sub = neg_sub[~neg_temp["index"].isin(intersecting)]
 
-            # Filter out non-school POIs that intersect with buffered school locations
-            intersecting = pos_temp.sjoin(neg_temp, how="inner")["index"]
-            neg_sub = neg_sub[~neg_temp["index"].isin(intersecting)]
-
-            # Save filtered country-level dataset
-            columns = config["columns"]
-            neg_sub = neg_sub[columns]
-            neg_sub.to_file(out_subfile, driver="GeoJSON")
-
-        subdata = gpd.read_file(out_subfile).reset_index(drop=True)
+        # Save filtered country-level dataset
+        subdata = neg_sub[config["columns"]]
         data.append(subdata)
 
     # Combine and save datasets
-    filtered_file = os.path.join(cwd, neg_dir, f"{name}.geojson")
-    data = data_utils._concat_data(data, out_file=filtered_file)
+    data = data_utils._concat_data(data)
     return data
 
 
@@ -469,12 +460,12 @@ def clean_data(config, category, name="clean", source="ms", id="UID"):
     # Define the output directory for processed data based on the category and name
     out_dir = data_utils._makedir(os.path.join(config["vectors_dir"], category, name))
     
-    if category == config["pos_category"]:
+    if category == config["pos_class"]:
         data_dir = os.path.join(config["vectors_dir"], category)
         data = data_utils.read_data(data_dir, exclude=[f"{name}.geojson"])
             
     # For negative samples, remove POIs within the positive object vicinity
-    elif category == config["neg_category"]:
+    elif category == config["neg_class"]:
         data = _filter_pois_within_object_proximity(config, proximity=config["object_proximity"])
 
     out_data = []
@@ -499,7 +490,7 @@ def clean_data(config, category, name="clean", source="ms", id="UID"):
                     continue
 
                 # Remove objects containing certain keywords
-                if category == config["pos_category"]:
+                if category == config["pos_class"]:
                     subsubdata = _filter_keywords(
                         subsubdata, exclude=config["exclude"]
                     )[config["columns"]]
@@ -551,7 +542,7 @@ def clean_data(config, category, name="clean", source="ms", id="UID"):
     out_file = os.path.join(os.path.dirname(out_dir), f"{name}.geojson")
     data = data_utils._concat_data(out_data, out_file)
 
-    if category == config["neg_category"]:
+    if category == config["neg_class"]:
         data = _augment_negative_samples(config, sname=name)
     return data
     
