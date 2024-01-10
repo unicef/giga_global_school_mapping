@@ -1,5 +1,3 @@
-pos_category: "school"
-neg_category: "non_school"
 vectors_dir: 'data/vectors/'
 rasters_dir: 'data/rasters/'
 columns: ['UID', 'source', 'iso', 'country', 'region', 'subregion', 'name', 'geometry', 'giga_id_school']
@@ -12,7 +10,6 @@ iso_codes: [
     'ZWE', 'BRA'
 ]
 
-# Data cleaning
 proximity: 50
 filter_buffer_size: 150
 sample_spacing: 300
@@ -20,3 +17,332 @@ object_proximity: 300
 name_match_threshold: 85
 name_match_proximity: 300
 priority: ["OSM", "OVERTURE", "UNICEF"]
+
+ms_dict: {
+ 'YEM': 'RepublicofYemen',
+ 'SEN': 'Senegal',
+ 'MDG': 'Madagascar',
+ 'AIA': 'Anguilla',
+ 'ATG': 'AntiguaandBarbuda',
+ 'BEN': 'Benin',
+ 'BIH': 'BosniaandHerzegovina',
+ 'BLZ': 'Belize',
+ 'BRB': 'Barbados',
+ 'BWA': 'Botswana',
+ 'CRI': 'CostaRica',
+ 'DMA': 'Dominica',
+ 'GHA': 'Ghana',
+ 'GIN': 'EquatorialGuinea',
+ 'GRD': 'Grenada',
+ 'HND': 'Honduras',
+ 'HUN': 'Hungary',
+ 'KAZ': 'Kazakhstan',
+ 'KEN': 'Kenya',
+ 'KIR': 'Kiribati',
+ 'KNA': 'StKittsandNevis',
+ 'LCA': 'SaintLucia',
+ 'MNG': 'Mongolia',
+ 'MSR': 'Montserrat',
+ 'MWI': 'Malawi',
+ 'NAM': 'Namibia',
+ 'NER': 'Niger',
+ 'NGA': 'Nigeria',
+ 'PAN': 'Panama',
+ 'RWA': 'Rwanda',
+ 'SLE': 'SierraLeone',
+ 'SLV': 'ElSalvador',
+ 'SSD': 'SouthSudan',
+ 'THA': 'Thailand',
+ 'TTO': 'TrinidadandTobago',
+ 'UKR': 'Ukraine',
+ 'UZB': 'Uzbekistan',
+ 'VCT': 'Grenada',
+ 'VGB': 'BritishVirginIslands',
+ 'ZAF': 'SouthAfrica',
+ 'ZWE': 'Zimbabwe',
+ 'BRA': 'Brazil'
+}
+
+# Specify school and non-school keywords
+school: {
+    amenity: [
+        "school",
+        "academy"
+    ],
+    translated: [
+        "مدرسة",
+        "مدرسة",
+        "أكاديمية",
+        "akadimiya",
+        "shule",
+        "akademia",
+        "makaranta",
+        "ile-iwe",
+        "ile-iwe giga",
+        "akademi",
+        "isikole",
+        "ትምህርት ቤት",
+        "iskuul",
+        "skool",
+        "akademie",
+        "école",
+        "académie",
+        "escuela",
+        "escola",
+        "мектеп",
+        "am-pianarana",
+        "maktab",
+        "škola",
+        "школа",
+        "iskola",
+        "сургууль",
+        "ishuri",
+        "โรงเรียน",
+        "chikoro",
+        "isikolo"
+    ]
+}
+non_school: {
+    amenity: [
+        "fast_food",
+        "food_court",
+        "cafe",
+        "restaurant",
+        "pub",
+        "bar",
+        "bank",
+        "clinic",
+        "doctors",
+        "hospital",
+        "pharmacy",
+        "dentist",
+        "veterinary",
+        "arts_centre",
+        "cinema",
+        "casino",
+        "community_centre",
+        "conference_centre",
+        "events_venue",
+        "fuel",
+        "exhibition_centre",
+        "planetarium",
+        "theatre",
+        "nightclub",
+        "courthouse",
+        "fire_station",
+        "police",
+        "post_office",
+        "prison",
+        "townhall",
+        "crematorium",
+        "funeral_hall",
+        "internet_cafe",
+        "marketplace",
+        "place_of_mourning",
+        "place_of_worship"
+    ],
+    building: [
+        "commercial",
+        "industrial",
+        "office",
+        "retail",
+        "warehouse",
+        "church",
+        "cathedral",
+        "chapel",
+        "mosque",
+        "temple",
+        "synagogue",
+        "shrine",
+        "supermarket",
+        "fire_station",
+        "police",
+        "prison",
+        "hospital",
+        "museum",
+        "military"
+    ],
+    craft: [
+        "agricultural_engines",
+        "atelier",
+        "bakery",
+        "blacksmith",
+        "boatbuilder",
+        "brewery",
+        "cabinet_maker",
+        "carpenter",
+        "electronics_repair",
+        "distillery",
+        "oil_mill"
+    ],
+    healthcare: [
+        "alternative",
+        "audiologist",
+        "birthing_center",
+        "chiropractor",
+        "dentist",
+        "midwife",
+        "occupational_therapist",
+        "optometrist",
+        "physiotherapist",
+        "psychologist",
+        "speech_therapist",
+        "blood_bank",
+        "blood_donation",
+        "vaccination_centre"
+    ],
+    historic: [
+        "church",
+        "cathedral",
+        "castle",
+        "mosque",
+        "tower"
+    ],
+    landuse: [
+        "commercial",
+        "retail",
+        "industrial",
+        "warehouse",
+        "cemetery",
+        "religious"
+    ],
+    leisure: [
+        "adult_gaming_centre",
+        "amusement_arcade"
+    ],
+    military: [
+        "barracks",
+        "base",
+        "office"
+    ],
+    place: [
+        "farm",
+        "allotments"
+    ],
+    power: [
+        "transformer"
+    ],
+    public_transport: [
+        "station"
+    ],
+    railway: [
+        "station"
+    ],
+    office: [
+        "government"
+    ],
+    shop: [
+        "alcohol",
+        "bakery",
+        "beverages",
+        "brewing_supplies",
+        "butcher",
+        "cheese",
+        "chocolate",
+        "coffee",
+        "confectionery",
+        "convenience",
+        "farm",
+        "food",
+        "general",
+        "department_store",
+        "kiosk",
+        "mall",
+        "supermarket",
+        "wholesale",
+        "beauty",
+        "fabric",
+        "fashion",
+        "doityourself",
+        "electronics",
+        "garden_centre"
+    ],
+    tourism: [
+        "guest_house",
+        "hostel",
+        "hotel",
+        "motel",
+        "museum",
+        "chalet",
+        "apartment",
+        "zoo"
+    ]
+}
+
+exclude: 
+- "Daycare"
+- "Taekwando"
+- "Swim"
+- "Swimming"
+- "Driving"
+- "Flight"
+- "K9"
+- "Dog"
+- "Ballet"
+- "Sunday School"
+- "Quick Minds"
+- "Dance"
+- "Soccer"
+- "Bikeride"
+- "Basketball"
+- "Taekwondo"
+- "Football"
+- "Tennis"
+- "Beauty"
+- "Cosmetics"
+- "Nursery"
+- "Makeup"
+- "Salon"
+- "Art"
+- "Nails"
+- "Tattoo"
+- "Infant"
+- "Pre"
+- "Pre-school"
+- "Preschool"
+- "Fitness"
+- "Sports"
+- "Music"
+- "Startup"
+- "Museum"
+- "Coding"
+- "Code"
+- "Kinder"
+- "Kindergarten"
+- "Baby"
+- "University"
+- "College"
+- "Business"
+- "Professional"
+- "Professionnelle"
+- "Medicine"
+- "Management"
+- "Combat"
+- "Medical"
+- "Language"
+- "English"
+- "Yunivesithi"
+- "جامعة"
+- "كلية"
+- "رياضة"
+- "Chuo kikuu"
+- "Chuo"
+- "Koleji"
+- "ዩኒቨርሲቲ"
+- "Yuniversiti"
+- "Universiteit"
+- "Kollege"
+- "Université"
+- "Collège"
+- "Collége"
+- "Aviation"
+- "Martial Arts"
+- "Nursing"
+- "Technical"
+- "Institute"
+- "Institut"
+- "Institution"
+- "Tutor"
+- "Tutors"
+- "Bookstore"
+- "Supplies"
