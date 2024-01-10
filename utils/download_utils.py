@@ -60,7 +60,7 @@ def download_osm(config, category, source="osm"):
         - "iso_codes" (list): List of ISO country codes.
         - "vectors_dir" (str): Directory to store vector data.
         - "columns" (list): List of columns for the dataset.
-        - "iso_regional_codes" (str): URL or filepath to the ISO regional codes data CSV file.
+        - "iso_codes_url" (str): URL or filepath to the ISO regional codes data CSV file.
     - category (str): Type of data category to download.
     - source (str, optional): Source identifier for the downloaded data. Defaults to "osm".
 
@@ -73,7 +73,7 @@ def download_osm(config, category, source="osm"):
     osm_file = os.path.join(os.path.dirname(out_dir), f"{source}.geojson")
     iso_codes = config['iso_codes']
 
-    url = config["iso_regional_codes"]
+    url = config["iso_codes_url"]
     codes = pd.read_csv(url)
 
     keywords = config[category]
@@ -387,15 +387,23 @@ def download_ms(config, source="ms", verbose=False):
             subprocess.Popen(f"{command1} && {command2}", shell=True)
 
 
-def download_ghsl(config):
+def download_ghsl(config, type="built_c"):
     ghsl_folder = os.path.join(config["rasters_dir"], "ghsl")
-    data_utils._makedir(ghsl_folder)
+    ghsl_folder = data_utils._makedir(ghsl_folder)
     
-    ghsl_path = os.path.join(ghsl_folder, config["ghsl_file"])
+    if type == "built_c":
+        ghsl_path = os.path.join(ghsl_folder, config["ghsl_built_c_file"])
+    elif type == "smod":
+        ghsl_path = os.path.join(ghsl_folder, config["ghsl_smod_file"])
+        
     ghsl_zip = os.path.join(ghsl_folder, "ghsl.zip")
     if not os.path.exists(ghsl_path):
-        command1 = f"wget {config['ghsl_url']} -O {ghsl_zip}"
-        command3 = f"unzip {ghsl_zip} -d {ghsl_folder}"
+        if type == "built_c":
+            command1 = f"wget {config['ghsl_built_c_url']} -O {ghsl_zip}"
+        elif type == "smod":
+            command1 = f"wget {config['ghsl_smod_url']} -O {ghsl_zip}"
+            
+        command2 = f"unzip {ghsl_zip} -d {ghsl_folder}"
         subprocess.Popen(f"{command1} && {command2}", shell=True)
 
     

@@ -69,7 +69,7 @@ def map_coordinates(
     """
     
     cwd = os.path.dirname(os.getcwd())
-    vector_dir = config["VECTORS_DIR"]
+    vector_dir = config["vectors_dir"]
     
     filename = _get_filename(cwd, iso, vector_dir, category, "clean")
     data = gpd.read_file(filename)
@@ -102,7 +102,8 @@ def validate_data(
     n_cols=4,
     filename=None,
     name="clean",
-    id_col="UID"
+    id_col="UID",
+    show_validated=True
 ):
     """
     Perform data cleaning and provide an interactive widget for data inspection and validation.
@@ -123,9 +124,9 @@ def validate_data(
     """
     
     cwd = os.path.dirname(os.getcwd())
-    image_dir = config["RASTERS_DIR"]
-    vector_dir = config["VECTORS_DIR"]
-    dir_ = config["DIR"]
+    image_dir = config["rasters_dir"]
+    vector_dir = config["vectors_dir"]
+    maxar_dir = config["maxar_dir"]
 
     if not filename:
         filename = _get_filename(cwd, iso, vector_dir, category, name)
@@ -134,7 +135,9 @@ def validate_data(
     if 'validated' not in data.columns:
         data["validated"] = 0
         
-    samples = data[(data['clean'] == 0)] # & (data['validated'] == 0)]
+    samples = data[(data['clean'] == 0)]
+    if not show_validated:
+        samples = samples[(samples['validated'] == 0)]
     samples = samples.iloc[start_index : start_index + (n_rows * n_cols)]
     
     grid = GridspecLayout(n_rows * row_inc + n_rows, n_cols)
@@ -151,7 +154,7 @@ def validate_data(
         - Image: A widget displaying the image.
         """
         
-        class_dir = os.path.join(cwd, image_dir, dir_, iso, category.lower())
+        class_dir = os.path.join(cwd, image_dir, maxar_dir, iso, category.lower())
         filepath = os.path.join(class_dir, f"{item[id_col]}.tiff")
         img = open(filepath, "rb").read()
         
@@ -258,9 +261,9 @@ def inspect_images(
     """
     
     cwd = os.path.dirname(os.getcwd())
-    image_dir = config["RASTERS_DIR"]
-    vector_dir = config["VECTORS_DIR"]
-    dir_ = config["DIR"]
+    image_dir = config["rasters_dir"]
+    vector_dir = config["vectors_dir"]
+    maxar_dir = config["maxar_dir"]
 
     if not filename:
         filename = _get_filename(cwd, iso, vector_dir, category, "clean")
@@ -282,7 +285,7 @@ def inspect_images(
 
     # Iterate over the samples to display associated images
     for idx, item in samples.iterrows():
-        class_dir = os.path.join(cwd, image_dir, dir_, iso, category.lower())
+        class_dir = os.path.join(cwd, image_dir, maxar_dir, iso, category.lower())
         filepath = os.path.join(class_dir, f"{item[id_col]}.tiff")
 
         # Open and display the image on the subplot
