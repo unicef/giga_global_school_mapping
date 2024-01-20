@@ -1,4 +1,4 @@
-iso_codes: ["RWA"] 
+iso_codes: ["SSD"] 
 embed_model: "dinov2_vits14"
 
 test_size: 0.2

@@ -1,11 +1,12 @@
-iso_codes: ["RWA"] 
-embed_model: "dinov2_vits14"
+iso_codes: ["BIH"] 
+embed_model: "dinov2_vitl14"
 
 test_size: 0.2
 image_size: 560
-model: 'LogisticRegression'
+model: 'SVC'
 model_params:
-    penalty: ['l1', 'l2']
+    kernel: ['linear', 'poly', 'rbf', 'sigmoid']
+    gamma: [1, 0.1, 0.01, 0.001, 0.0001]
     C: [0.001, 0.01, 0.1, 1.0, 10]
 selector: 
 selector_params:

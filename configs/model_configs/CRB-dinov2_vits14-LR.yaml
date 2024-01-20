@@ -1,4 +1,5 @@
-iso_codes: ["RWA"] 
+name: "CRB"
+iso_codes: ["TTO", "BLZ", "BRB", "LCA", "VCT", "GRD", "DMA", "ATG", "KNA"]
 embed_model: "dinov2_vits14"
 
 test_size: 0.2
