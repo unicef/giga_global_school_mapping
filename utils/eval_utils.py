@@ -17,6 +17,13 @@ from sklearn.metrics import (
 json.fallback_table[np.ndarray] = lambda array: array.tolist()
 
 
+def get_results(y_test, y_preds, pos_class, classes, results_dir):
+    results = evaluate(y_test, y_preds, pos_class)
+    cm = get_confusion_matrix(y_test, y_preds, classes)
+    save_results(results, cm, results_dir)
+    return results
+
+
 def save_results(results, cm, exp_dir):
     """
     Save evaluation results and confusion matrix to the specified directory.

@@ -165,7 +165,6 @@ def model_trainer(c, data, features, target):
 
 def load_data(
     config, 
-    name=None,
     attributes=["rurban"],
     in_dir="clean", 
     out_dir="train",
@@ -174,7 +173,9 @@ def load_data(
     cwd = os.path.dirname(os.getcwd())
     vector_dir = os.path.join(cwd, config["vectors_dir"])
     iso_codes = config["iso_codes"]
-    name = iso_codes[0] if not name else name
+    name = iso_codes[0] 
+    if "name" in config:
+        name = config["name"] if config["name"] else name
     test_size = config["test_size"]
 
     filename = f"{name}_{out_dir}.geojson"
@@ -235,6 +236,21 @@ def _print_stats(data, attributes, test_size):
     )
     subcounts = subcounts.set_index(attributes + ["dataset"])
     logging.info(f'\n{subcounts.to_string()}')
+
+    if len(data.iso.unique()) > 1:
+        subcounts = pd.DataFrame(
+            data.groupby(["iso", "dataset", "class"]).size().reset_index()
+        )
+        subcounts.columns = ["iso", "dataset", "class", "count"]
+        subcounts = subcounts.set_index(["iso", "dataset", "class"])
+        logging.info(f'\n{subcounts.to_string()}')
+
+        subcounts = pd.DataFrame(
+            data.groupby(["iso", "dataset"]).size().reset_index()
+        )
+        subcounts.columns = ["iso", "dataset", "count"]
+        subcounts = subcounts.set_index(["iso", "dataset"])
+        logging.info(f'\n{subcounts.to_string()}')
 
     subcounts = pd.DataFrame(
         data.groupby(["dataset", "class"]).size().reset_index()

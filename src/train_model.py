@@ -17,6 +17,24 @@ import wandb
 cwd = os.path.dirname(os.getcwd())
 
 
+def save_results(test, target, pos_class, classes, results_dir, prefix=None, log=True):
+    if not os.path.exists(results_dir):
+        os.makedirs(results_dir)
+    results = eval_utils.get_results(
+        test[target], 
+        test["pred"], 
+        pos_class, 
+        classes, 
+        results_dir
+    )
+    if prefix: 
+        results = {f"{prefix}_{key}": val for key, val in results.items()}
+    if log: 
+        logging.info(results)
+        wandb.log(results)
+    return results
+    
+
 def main(config):
     exp_name = config['config_name']
     wandb.run.name = exp_name
@@ -30,7 +48,7 @@ def main(config):
     model.to(device)
 
     data = model_utils.load_data(config, attributes=["rurban", "iso"], verbose=True)
-    embeddings = embed_utils.compute_embeddings(config, data, model)
+    embeddings = embed_utils.get_image_embeddings(config, data, model)
     embeddings.columns = [str(x) for x in embeddings.columns]
     
     test = embeddings [embeddings.dataset == "test"]
@@ -41,14 +59,14 @@ def main(config):
     logging.info(f"Train size: {train.shape}")
     
     target = "class"
-    features = [str(x) for x in embeddings.columns[1:-2]]
+    features = [str(x) for x in embeddings.columns[1:-4]]
     classes = list(embeddings[target].unique())
     logging.info(f"No. of features: {len(features)}")
     logging.info(f"Classes: {classes}")
 
     cv = model_utils.model_trainer(c, train, features, target)
-    logging.info(cv.best_estimator_)
-    logging.info(cv.best_score_)
+    logging.info(f"Best estimator: {cv.best_estimator_}")
+    logging.info(f"Best CV score: {cv.best_score_}")
 
     model = cv.best_estimator_
     model.fit(train[features], train[target].values)
@@ -57,12 +75,40 @@ def main(config):
     model_file = os.path.join(results_dir, f"{config['config_name']}.pkl")
     joblib.dump(model, model_file)
 
-    results = eval_utils.evaluate(test[target], preds, config["pos_class"])
-    cm = eval_utils.get_confusion_matrix(test[target], preds, classes)
-    eval_utils.save_results(results, cm, results_dir)
-    wandb.log(results)
+    test["pred"] = preds
+    pos_class = config["pos_class"]
+    results = save_results(test, target, pos_class, classes, results_dir)
 
-
+    for rurban in ["urban", "rural"]:
+        subresults_dir = os.path.join(results_dir, rurban)
+        subtest = test[test.rurban == rurban]
+        results = save_results(subtest, target, pos_class, classes, subresults_dir, rurban)
+    
+    if len(config["iso_codes"]) > 1:
+        for iso_code in config["iso_codes"]:
+            subresults_dir = os.path.join(results_dir, iso_code)
+            subtest = test[test.iso == iso_code]
+            results = save_results(
+                subtest, 
+                target, 
+                pos_class, 
+                classes, 
+                subresults_dir, 
+                iso_code
+            )
+            for rurban in ["urban", "rural"]:
+                subsubresults_dir = os.path.join(subresults_dir, rurban)
+                subsubtest = subtest[subtest.rurban == rurban]
+                results = save_results(
+                    subsubtest, 
+                    target, 
+                    pos_class, 
+                    classes, 
+                    subsubresults_dir, 
+                    f"{iso_code}_{rurban}"
+                )
+            
+            
 if __name__ == "__main__":
     # Parser
     parser = argparse.ArgumentParser(description="Model Training")
@@ -74,11 +120,14 @@ if __name__ == "__main__":
     c = config_utils.load_config(config_file)
     log_c = {
         key: val for key, val in c.items() 
-        if ('url' not in key) and ('dir' not in key)
+        if ('url' not in key) 
+        and ('dir' not in key)
+        and ('file' not in key)
     }
     iso_code = c["iso_codes"][0]
     if "name" in c: iso_code = c["name"]
     log_c["iso_code"] = iso_code
+    log_c.pop("iso_codes", None)
     logging.info(log_c)
     
     wandb.init(

@@ -43,6 +43,12 @@ def load_config(config_file_exp, prefix=""):
     sys_config = create_config(sys_config_file, prefix=prefix)
     config = create_config(config_file_exp, prefix=prefix)
     config['config_name'] = os.path.basename(config_file_exp).split('.')[0]
+    remove = []
+    for key, val in sys_config.items():
+        if key in config:
+            remove.append(key)
+    for key in remove:
+        sys_config.pop(key)
     config.update(sys_config)
     
     return config
