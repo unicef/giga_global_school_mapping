@@ -11,3 +11,4 @@ layers: ['DigitalGlobe:Imagery']
 exceptions: 'application/vnd.ogc.se_xml'
 featureprofile: 'Most_Aesthetic_Mosaic_Profile'
 coverage_cql_filter: 'productType =%27Pan Sharpened Natural Color%27'
+coverage_cql_filter: ''
