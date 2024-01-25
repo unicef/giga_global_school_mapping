@@ -22,13 +22,15 @@ logging.basicConfig(level=logging.INFO)
 def download_sat_images(
     creds,
     config,
-    category,
+    category=None,
     iso=None,
     sample_size=None,
     src_crs="EPSG:4326",
     id_col="UID",
     name="clean",
+    data=None,
     filename=None,
+    out_dir=None,
     download_validated=False
 ):
     """
@@ -48,14 +50,14 @@ def download_sat_images(
     Returns:
     - None
     """
-    
     cwd = os.path.dirname(os.getcwd())
-    vectors_dir = config["vectors_dir"]
-
-    if not filename:
-        filename = f"{iso}_{name}.geojson"
-        filename = os.path.join(cwd, vectors_dir, category, name, filename)
-    data = gpd.read_file(filename).reset_index(drop=True)
+    
+    if data is None:
+        if not filename:
+            vectors_dir = config["vectors_dir"]
+            filename = f"{iso}_{name}.geojson"
+            filename = os.path.join(cwd, vectors_dir, category, name, filename)
+        data = gpd.read_file(filename).reset_index(drop=True)
     
     if "clean" in data.columns:
         data = data[data["clean"] == 0]
@@ -66,10 +68,12 @@ def download_sat_images(
         data = data[data["iso"] == iso].reset_index(drop=True)
     if sample_size:
         data = data.iloc[:sample_size]
+
     data = data_utils._convert_crs(data, data.crs, config["srs"])
     logging.info(f"Data dimensions: {data.shape}, CRS: {data.crs}")
 
-    out_dir = os.path.join(cwd, config["rasters_dir"], config["maxar_dir"], iso, category)
+    if not out_dir:
+        out_dir = os.path.join(cwd, config["rasters_dir"], config["maxar_dir"], iso, category)
     out_dir = data_utils._makedir(out_dir)
 
     url = f"{config['digitalglobe_url']}connectid={creds['connect_id']}"
@@ -78,26 +82,29 @@ def download_sat_images(
     bar_format = "{l_bar}{bar:20}{r_bar}{bar:-20b}"
     for index in tqdm(range(len(data)), bar_format=bar_format):
         image_file = os.path.join(out_dir, f"{data[id_col][index]}.tiff")
-        if not os.path.exists(image_file):
-            bbox = (
-                data.lon[index] - config["size"],
-                data.lat[index] - config["size"],
-                data.lon[index] + config["size"],
-                data.lat[index] + config["size"],
-            )
-            img = wms.getmap(
-                bbox=bbox,
-                layers=config["layers"],
-                srs=config["srs"],
-                size=(config["width"], config["height"]),
-                featureProfile=config["featureprofile"],
-                coverage_cql_filter=config["coverage_cql_filter"],
-                exceptions=config["exceptions"],
-                transparent=config["transparent"],
-                format=config["format"],
-            )
-            with open(image_file, "wb") as file:
-                file.write(img.read())
+        while not os.path.exists(image_file):
+            try:
+                bbox = (
+                    data.lon[index] - config["size"],
+                    data.lat[index] - config["size"],
+                    data.lon[index] + config["size"],
+                    data.lat[index] + config["size"],
+                )
+                img = wms.getmap(
+                    bbox=bbox,
+                    layers=config["layers"],
+                    srs=config["srs"],
+                    size=(config["width"], config["height"]),
+                    featureProfile=config["featureprofile"],
+                    coverage_cql_filter=config["coverage_cql_filter"],
+                    exceptions=config["exceptions"],
+                    transparent=config["transparent"],
+                    format=config["format"],
+                )
+                with open(image_file, "wb") as file:
+                    file.write(img.read())
+            except:
+                pass
 
 
 def main():
