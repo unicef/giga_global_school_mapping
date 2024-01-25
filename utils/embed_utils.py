@@ -20,18 +20,22 @@ SEED = 42
 
 device = torch.device('cuda' if torch.cuda.is_available() else "cpu")
 
-def get_filepaths(config, data):
+def get_image_filepaths(config, data, in_dir=None):
     filepaths = []
     cwd = os.path.dirname(os.getcwd())
     for index, row in data.iterrows():
-        filepath = os.path.join(
-            cwd, 
-            config["rasters_dir"], 
-            config["maxar_dir"], 
-            row["iso"],
-            row["class"],
-            f"{row['UID']}.tiff"
-        )
+        file = f"{row['UID']}.tiff"
+        if not in_dir:
+            filepath = os.path.join(
+                cwd, 
+                config["rasters_dir"], 
+                config["maxar_dir"], 
+                row["iso"], 
+                row["class"],
+                file 
+            )
+        else:
+            filepath = os.path.join(in_dir, file)
         filepaths.append(filepath)
     return filepaths
     
@@ -51,38 +55,45 @@ def load_image(image_file, image_size) -> torch.Tensor:
     return transform(image)[:3].unsqueeze(0)
 
 
-def compute_embeddings(
-    config, 
-    data, 
-    model, 
-    out_dir="embeds", 
-    iso=None
-):
+def compute_embeddings(files, model, image_size):        
     embeddings = []
-    files = get_filepaths(config, data)
-    iso = data.iloc[0].iso if not iso else iso
-
-    out_dir = data_utils._makedir(os.path.join(config["vectors_dir"], out_dir))
-    filename = os.path.join(out_dir, f"{iso}_{model.name}_embeds.csv")
-
-    if os.path.exists(filename):
-        embeddings = pd.read_csv(filename)
-        logging.info(f"Reading file {filename}")
-        return embeddings
-
-    image_size = config["image_size"]
     with torch.no_grad():
         pbar = data_utils._create_progress_bar(files)
         for file in pbar:
             embedding = model(load_image(file, image_size).to(device))
             embedding = np.array(embedding[0].cpu().numpy()).reshape(1, -1)[0]
             embeddings.append(embedding)
-    
-    embeddings = pd.DataFrame(data=embeddings, index=data.UID)
-    embeddings["dataset"] = data["dataset"].values
-    embeddings["class"] = data["class"].values
-    embeddings.to_csv(filename)
+    return embeddings
 
+
+def get_image_embeddings(
+    config, 
+    data, 
+    model, 
+    out_dir, 
+    in_dir=None,
+    columns=[],
+    name=None
+):
+    files = get_image_filepaths(config, data, in_dir)
+    if not name: 
+        name = config["name"] if "name" in config else data.iloc[0].iso        
+
+    out_dir = data_utils._makedir(out_dir)
+    filename = os.path.join(out_dir, f"{name}_{model.name}_embeds.csv")
+    
+    if os.path.exists(filename):
+        embeddings = pd.read_csv(filename)
+        logging.info(f"Reading file {filename}")
+        return embeddings
+    
+    embeddings = compute_embeddings(files, model, config["image_size"])
+    embeddings = pd.DataFrame(data=embeddings, index=data.UID)
+
+    for column in columns:
+        embeddings[column] = data[column].values
+    embeddings.to_csv(filename)
+    
     logging.info(f"Saved to {filename}")
     return embeddings
 
@@ -95,7 +106,7 @@ def visualize_embeddings(
     # Source: https://betterprogramming.pub/dinov2-the-new-frontier-in-self-supervised-learning-b3a939f6d533
     image_size = config["image_size"]
     imgs_tensor = torch.zeros(batch_size, 3, image_size, image_size)
-    filepaths = get_filepaths(config, data)
+    filepaths = get_image_filepaths(config, data)
     indexes = [random.randint(0, len(data)) for x in range(batch_size)]
     for i, index in enumerate(indexes):
         image = load_image(filepaths[index], image_size)
