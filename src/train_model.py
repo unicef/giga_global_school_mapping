@@ -48,7 +48,11 @@ def main(config):
     model.to(device)
 
     data = model_utils.load_data(config, attributes=["rurban", "iso"], verbose=True)
-    embeddings = embed_utils.get_image_embeddings(config, data, model)
+    columns = ["iso", "rurban", "dataset", "class"]
+    out_dir = os.path.join(config["vectors_dir"], "embeddings")
+    embeddings = embed_utils.get_image_embeddings(
+        config, data, model, out_dir, in_dir=None, columns=columns
+    )
     embeddings.columns = [str(x) for x in embeddings.columns]
     
     test = embeddings [embeddings.dataset == "test"]
