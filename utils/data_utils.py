@@ -17,6 +17,26 @@ pd.options.mode.chained_assignment = None
 logging.basicConfig(level=logging.INFO)
 
 
+def get_image_filepaths(config, data, in_dir=None):
+    filepaths = []
+    cwd = os.path.dirname(os.getcwd())
+    for index, row in data.iterrows():
+        file = f"{row['UID']}.tiff"
+        if not in_dir:
+            filepath = os.path.join(
+                cwd, 
+                config["rasters_dir"], 
+                config["maxar_dir"], 
+                row["iso"], 
+                row["class"],
+                file 
+            )
+        else:
+            filepath = os.path.join(in_dir, file)
+        filepaths.append(filepath)
+    return filepaths
+
+
 def _clean_text(text):
     """
     Cleans the text by removing all non-word characters and converting to uppercase.

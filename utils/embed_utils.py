@@ -19,25 +19,6 @@ import random
 SEED = 42
 
 device = torch.device('cuda' if torch.cuda.is_available() else "cpu")
-
-def get_image_filepaths(config, data, in_dir=None):
-    filepaths = []
-    cwd = os.path.dirname(os.getcwd())
-    for index, row in data.iterrows():
-        file = f"{row['UID']}.tiff"
-        if not in_dir:
-            filepath = os.path.join(
-                cwd, 
-                config["rasters_dir"], 
-                config["maxar_dir"], 
-                row["iso"], 
-                row["class"],
-                file 
-            )
-        else:
-            filepath = os.path.join(in_dir, file)
-        filepaths.append(filepath)
-    return filepaths
     
 
 def load_image(image_file, image_size) -> torch.Tensor:
@@ -75,7 +56,7 @@ def get_image_embeddings(
     columns=[],
     name=None
 ):
-    files = get_image_filepaths(config, data, in_dir)
+    files = data_utils.get_image_filepaths(config, data, in_dir)
     if not name: 
         name = config["name"] if "name" in config else data.iloc[0].iso        
 
