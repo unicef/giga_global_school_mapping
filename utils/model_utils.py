@@ -184,7 +184,7 @@ def load_data(
         data = gpd.read_file(out_file)
         if verbose:
             logging.info(f"Reading file {out_file}")
-            print(_print_stats(data, attributes, test_size))
+            _print_stats(data, attributes, test_size)
         return data
         
     data = []
