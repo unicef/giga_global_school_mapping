@@ -127,7 +127,7 @@ def main(c):
     # Calculate test performance using best model
     logging.info("\nTest Results")
     test_results, test_cm = cnn_utils.evaluate(
-        data_loader["test"], classes, model, criterion, device, wandb=wandb, logging=logging
+        data_loader["test"], classes, model, criterion, device, pos_label=1, wandb=wandb, logging=logging
     )
 
     # Save results in experiment directory
