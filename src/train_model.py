@@ -35,8 +35,8 @@ def save_results(test, target, pos_class, classes, results_dir, prefix=None, log
     return results
     
 
-def main(config):
-    exp_name = config['config_name']
+def main(iso, config):
+    exp_name = f"{iso}-{config['config_name']}"
     wandb.run.name = exp_name
     results_dir = os.path.join(cwd, config["exp_dir"], exp_name)
     if not os.path.exists(results_dir):
@@ -117,27 +117,28 @@ if __name__ == "__main__":
     # Parser
     parser = argparse.ArgumentParser(description="Model Training")
     parser.add_argument("--model_config", help="Config file")
+    parser.add_argument("--iso", help="ISO code", default=[], nargs='+')
     args = parser.parse_args()
 
     # Load config
     config_file = os.path.join(cwd, args.model_config)
     c = config_utils.load_config(config_file)
+    c["iso_codes"] = args.iso
     log_c = {
         key: val for key, val in c.items() 
         if ('url' not in key) 
         and ('dir' not in key)
         and ('file' not in key)
     }
-    iso_code = c["iso_codes"][0]
-    if "name" in c: iso_code = c["name"]
-    log_c["iso_code"] = iso_code
-    log_c.pop("iso_codes", None)
+    iso = args.iso[0]
+    if "name" in c: iso = c["name"]
+    log_c["iso_code"] = iso
     logging.info(log_c)
     
     wandb.init(
-        project="UNICEFv1",
+        project="UNICEFv2",
         config=log_c,
         tags=[c["embed_model"], c["model"]]
     )
 
-    main(c)
+    main(iso, c)
