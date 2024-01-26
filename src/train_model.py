@@ -136,7 +136,7 @@ if __name__ == "__main__":
     logging.info(log_c)
     
     wandb.init(
-        project="UNICEFv2",
+        project="UNICEFv1",
         config=log_c,
         tags=[c["embed_model"], c["model"]]
     )
