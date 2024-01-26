@@ -1,7 +1,4 @@
-name: "CRB"
-iso_codes: ["TTO", "BLZ", "BRB", "LCA", "VCT", "GRD", "DMA", "ATG", "KNA"]
-embed_model: "dinov2_vitl14"
-
+embed_model: "dinov2_vitb14"
 test_size: 0.2
 image_size: 560
 model: 'LogisticRegression'

@@ -1,6 +1,4 @@
-iso_codes: ["MNG"] 
 embed_model: "dinov2_vitl14"
-
 test_size: 0.2
 image_size: 560
 model: 'SVC'
