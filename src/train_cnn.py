@@ -21,7 +21,7 @@ logging.info(f"Device: {device}")
 def main(c):    
     # Create experiment folder
     exp_name = f"{c['iso_code']}_{c['config_name']}"
-    exp_dir = os.path.join(c["exp_dir"], exp_name)
+    exp_dir = os.path.join(cwd, c["exp_dir"], exp_name)
     if not os.path.exists(exp_dir):
         os.makedirs(exp_dir)
     
@@ -31,15 +31,12 @@ def main(c):
     handler = logging.FileHandler(logname)
     handler.setLevel(logging.INFO)
     logger.addHandler(handler)
-    
-    logging.info(device)
     logging.info(exp_name)
 
     # Set wandb configs
     wandb.init(project="UNICEFv2", config=c)
     wandb.run.name = exp_name
     wandb.config = c
-    logging.info(c)
     
     # Load dataset
     phases = ["train", "test"]
@@ -82,12 +79,20 @@ def main(c):
             criterion,
             optimizer,
             device,
+            pos_label=1,
             wandb=wandb,
             logging=logging
         )
         # Evauate model
         val_results, val_cm = cnn_utils.evaluate(
-            data_loader["test"], classes, model, criterion, device, wandb=wandb, logging=logging
+            data_loader["test"], 
+            classes, 
+            model, 
+            criterion, 
+            device, 
+            pos_label=1,
+            wandb=wandb, 
+            logging=logging
         )
         scheduler.step(val_results["f1_score"])
 

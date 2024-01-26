@@ -156,7 +156,7 @@ def load_dataset(config, phases):
 
     data = {
         phase: SchoolDataset(
-            dataset[dataset.dataset==phase]
+            dataset[dataset.dataset==phase].iloc[:100]
             .sample(frac=1, random_state=SEED)
             .reset_index(drop=True),
             classes_dict,
@@ -179,7 +179,7 @@ def load_dataset(config, phases):
     return data, data_loader, classes
 
 
-def train(data_loader, model, criterion, optimizer, device, logging, wandb=None):
+def train(data_loader, model, criterion, optimizer, device, logging, pos_label, wandb=None):
     """
     Train the model on the provided data.
 
@@ -219,7 +219,7 @@ def train(data_loader, model, criterion, optimizer, device, logging, wandb=None)
             y_preds.extend(preds.data.cpu().numpy().tolist())
 
     epoch_loss = running_loss / len(data_loader)
-    epoch_results = eval_utils.evaluate(y_actuals, y_preds)
+    epoch_results = eval_utils.evaluate(y_actuals, y_preds, pos_label)
     epoch_results["loss"] = epoch_loss
 
     learning_rate = optimizer.param_groups[0]["lr"]
@@ -230,7 +230,7 @@ def train(data_loader, model, criterion, optimizer, device, logging, wandb=None)
     return epoch_results
 
 
-def evaluate(data_loader, class_names, model, criterion, device, logging, wandb=None):
+def evaluate(data_loader, class_names, model, criterion, device, logging, pos_label, wandb=None):
     """
     Evaluate the model using the provided data.
 
@@ -269,7 +269,7 @@ def evaluate(data_loader, class_names, model, criterion, device, logging, wandb=
         y_preds.extend(preds.data.cpu().numpy().tolist())
 
     epoch_loss = running_loss / len(data_loader)
-    epoch_results = eval_utils.evaluate(y_actuals, y_preds)
+    epoch_results = eval_utils.evaluate(y_actuals, y_preds, pos_label)
     epoch_results["loss"] = epoch_loss
 
     confusion_matrix, cm_metrics, cm_report = eval_utils.get_confusion_matrix(
