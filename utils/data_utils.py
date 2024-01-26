@@ -17,6 +17,26 @@ pd.options.mode.chained_assignment = None
 logging.basicConfig(level=logging.INFO)
 
 
+def get_image_filepaths(config, data, in_dir=None):
+    filepaths = []
+    cwd = os.path.dirname(os.getcwd())
+    for index, row in data.iterrows():
+        file = f"{row['UID']}.tiff"
+        if not in_dir:
+            filepath = os.path.join(
+                cwd, 
+                config["rasters_dir"], 
+                config["maxar_dir"], 
+                row["iso"], 
+                row["class"],
+                file 
+            )
+        else:
+            filepath = os.path.join(in_dir, file)
+        filepaths.append(filepath)
+    return filepaths
+
+
 def _clean_text(text):
     """
     Cleans the text by removing all non-word characters and converting to uppercase.
@@ -315,6 +335,30 @@ def _drop_duplicates(data, priority):
     return data
 
 
+def _generate_samples(config, iso_code, buffer_size, spacing, adm_level="ADM0", shapename=None):
+    # Get geographical boundaries for the ISO code at the specified administrative level
+    bounds = _get_geoboundaries(config, iso_code, adm_level=adm_level)
+    if shapename: bounds = bounds[bounds.shapeName == shapename]
+    bounds = bounds.to_crs("EPSG:3857") # Convert to EPSG:3857
+
+    # Calculate bounds for generating XY coordinates
+    xmin, ymin, xmax, ymax = bounds.total_bounds 
+    xcoords = [c for c in np.arange(xmin, xmax, spacing)]
+    ycoords = [c for c in np.arange(ymin, ymax, spacing)] 
+    
+    # Create all combinations of XY coordinates
+    coordinate_pairs = np.array(np.meshgrid(xcoords, ycoords)).T.reshape(-1, 2) 
+    # Create a list of Shapely points
+    geometries = gpd.points_from_xy(coordinate_pairs[:,0], coordinate_pairs[:,1]) 
+
+    # Create a GeoDataFrame of points and perform spatial join with bounds
+    points = gpd.GeoDataFrame(geometry=geometries, crs=bounds.crs).reset_index(drop=True)
+    points = gpd.sjoin(points, bounds, predicate='within')
+    points = points.drop(['index_right'], axis=1)
+    
+    return points
+
+
 def get_counts(config, column='iso', layer="clean"):
     """
     Retrieves the counts of specified categories based on a given column in the GeoJSON layers.
@@ -357,5 +401,4 @@ def get_counts(config, column='iso', layer="clean"):
     )
     counts.columns = categories
     
-    return counts
-    
+    return counts  

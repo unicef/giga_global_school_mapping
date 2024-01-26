@@ -9,3 +9,5 @@ data/
 outputs/
 exp/
 *temp*
+archive
+output

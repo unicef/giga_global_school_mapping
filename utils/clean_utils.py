@@ -24,7 +24,7 @@ warnings.simplefilter("ignore")
 logging.basicConfig(level=logging.INFO)
   
 
-def _generate_additional_negative_samples(
+def _sample_points(
     config, 
     iso_code, 
     buffer_size,
@@ -46,25 +46,7 @@ def _generate_additional_negative_samples(
     """
     # Get current working directory
     cwd = os.path.dirname(os.getcwd())
-
-     # Get geographical boundaries for the ISO code at the specified administrative level
-    bounds = data_utils._get_geoboundaries(config, iso_code, adm_level="ADM0")
-    bounds = bounds.to_crs("EPSG:3857") # Convert to EPSG:3857
-
-    # Calculate bounds for generating XY coordinates
-    xmin, ymin, xmax, ymax = bounds.total_bounds 
-    xcoords = [c for c in np.arange(xmin, xmax, spacing)]
-    ycoords = [c for c in np.arange(ymin, ymax, spacing)] 
-    
-    # Create all combinations of XY coordinates
-    coordinate_pairs = np.array(np.meshgrid(xcoords, ycoords)).T.reshape(-1, 2) 
-    # Create a list of Shapely points
-    geometries = gpd.points_from_xy(coordinate_pairs[:,0], coordinate_pairs[:,1]) 
-
-    # Create a GeoDataFrame of points and perform spatial join with bounds
-    points = gpd.GeoDataFrame(geometry=geometries, crs=bounds.crs).reset_index(drop=True)
-    points = gpd.sjoin(points, bounds, predicate='within')
-    points = points.drop(['index_right'], axis=1)
+    points = data_utils.generate_samples(config, iso_code, buffer_size, spacing)
 
     # Read positive data and perform buffer operation on geometries
     filename = f"{iso_code}_{sname}.geojson"
@@ -152,9 +134,7 @@ def _augment_negative_samples(config, sname="clean"):
         if n_pos > n_neg:
             buffer_size = config["object_proximity"]/2
             spacing = config["sample_spacing"]
-            points = _generate_additional_negative_samples(
-                config, iso_code, buffer_size, spacing=spacing, sname=sname
-            )
+            points = _sample_points(config, iso_code, buffer_size, spacing=spacing, sname=sname)
             
             points = data_utils._prepare_data(
                 config=config,
