@@ -156,7 +156,7 @@ def load_dataset(config, phases):
 
     data = {
         phase: SchoolDataset(
-            dataset[dataset.dataset==phase].iloc[:100]
+            dataset[dataset.dataset==phase]
             .sample(frac=1, random_state=SEED)
             .reset_index(drop=True),
             classes_dict,
