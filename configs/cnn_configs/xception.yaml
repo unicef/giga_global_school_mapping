@@ -7,7 +7,7 @@ model: "xception"
 pretrained: True
 scheduler: "ReduceLROnPlateau"
 optimizer: "Adam"
-label_smoothing: 
+label_smoothing: 0.1
 lr: 0.00001
 img_size: 224
 patience: 7
