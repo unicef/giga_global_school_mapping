@@ -10,6 +10,7 @@ import logging
 
 logging.basicConfig(level=logging.INFO)
 
+import timm
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -358,6 +359,9 @@ def get_model(model_type, n_classes, dropout=0):
         model = models.efficientnet_b0(weights=EfficientNet_B0_Weights.IMAGENET1K_V1)
         num_ftrs = model.classifier[1].in_features
         model.classifier[1] = nn.Linear(num_ftrs, n_classes)
+
+    if "xception" in model_type:
+        model = timm.create_model('xception', pretrained=True, num_classes=n_classes)
 
     return model
 
