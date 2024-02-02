@@ -62,7 +62,7 @@ def cnn_predict_images(data, model, config, in_dir, classes):
     return data
 
 
-def cnn_predict(tiles, iso_code, shapename, config, in_dir, n_classes=None, model_file=None):
+def cnn_predict(tiles, iso_code, shapename, config, in_dir, n_classes=None):
     """
     Predicts classes for buildings using a trained model and input image file.
 
@@ -77,7 +77,7 @@ def cnn_predict(tiles, iso_code, shapename, config, in_dir, n_classes=None, mode
     - Predictions for the building dataset using the trained model.
     """
     cwd = os.path.dirname(os.getcwd())
-    classes = [1, 0]
+    classes = {0: config["neg_class"], 1: config["pos_class"]}
     
     exp_dir = os.path.join(cwd, config["exp_dir"], f"{iso_code}_{config['config_name']}")
     model_file = os.path.join(exp_dir, f"{iso_code}_{config['config_name']}.pth")
@@ -115,6 +115,7 @@ def load_cnn(c, classes, model_file=None):
     model.load_state_dict(torch.load(model_file, map_location=device))
     model = model.to(device)
     model.eval()
+    logging.info(f"Device: {device}")
     
     logging.info("Model file {} successfully loaded.".format(model_file))
     return model
@@ -125,6 +126,7 @@ def load_vit(config):
     model.name = config["embed_model"]
     device = torch.device('cuda' if torch.cuda.is_available() else "cpu")
     model.to(device)
+    model.eval()
     logging.info(f"Device: {device}")
     return model
 
