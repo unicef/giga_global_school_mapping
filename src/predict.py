@@ -35,7 +35,7 @@ def main(args):
 
     tiles = pred_utils.generate_pred_tiles(
         data_config, iso_code, args.spacing, args.buffer_size, args.adm_level, args.shapename
-    ).reset_index().iloc[:100]
+    ).reset_index()
     tiles["UID"] = list(tiles.index)
     
     out_dir = data_utils._makedir(os.path.join(cwd, "output", iso_code, "tiles"))
