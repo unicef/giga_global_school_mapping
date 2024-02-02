@@ -21,6 +21,7 @@ import embed_utils
 import torch
 import torch.nn.functional as nn
 
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 logging.basicConfig(level=logging.INFO)
         
 
@@ -47,7 +48,7 @@ def cnn_predict_images(data, model, config, in_dir, classes):
     for file in pbar:
         image = Image.open(file).convert("RGB")
         transforms = cnn_utils.get_transforms(config["img_size"])
-        output = model(transforms["test"](image).unsqueeze(0))
+        output = model(transforms["test"](image.to(device)).unsqueeze(0))
         prob = nn.softmax(output, dim=1).detach().numpy()[0]
         probs.append(prob)
         _, pred = torch.max(output, 1)
@@ -110,7 +111,6 @@ def load_cnn(c, classes, model_file=None):
     """
     
     n_classes = len(classes)
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = cnn_utils.get_model(c["model"], n_classes, c["dropout"])
     model.load_state_dict(torch.load(model_file, map_location=device))
     model = model.to(device)
