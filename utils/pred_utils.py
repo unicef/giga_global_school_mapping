@@ -55,7 +55,7 @@ def cnn_predict_images(data, model, config, in_dir, classes):
         label = str(classes[int(pred[0])])
         preds.append(label)
 
-    probs_col = [f"{classes[index]}_PROB" for index in range(len(classes))]
+    probs_col = [f"{classes[index]}_prob" for index in range(len(classes))]
     probs = pd.DataFrame(probs, columns=probs_col)
     data["pred"] = preds
     data["prob"] = probs.max(axis=1)
@@ -63,7 +63,7 @@ def cnn_predict_images(data, model, config, in_dir, classes):
     return data
 
 
-def cnn_predict(tiles, iso_code, shapename, config, in_dir, n_classes=None):
+def cnn_predict(data, iso_code, shapename, config, in_dir, n_classes=None):
     """
     Predicts classes for buildings using a trained model and input image file.
 
@@ -89,7 +89,7 @@ def cnn_predict(tiles, iso_code, shapename, config, in_dir, n_classes=None):
     name = f"{iso_code}_{shapename}"
     
     out_file = os.path.join(out_dir, f"{name}_{config['config_name']}_results.gpkg")
-    results = cnn_predict_images(tiles, model, config, in_dir, classes)
+    results = cnn_predict_images(data, model, config, in_dir, classes)
     results = results[["UID", "geometry", "shapeName", "pred", "prob"]]
     results = gpd.GeoDataFrame(results, geometry="geometry")
     results.to_file(out_file, driver="GPKG")
@@ -131,7 +131,7 @@ def load_vit(config):
     return model
 
 
-def vit_pred(tiles, config, iso_code, shapename, sat_dir, id_col="UID"):
+def vit_pred(data, config, iso_code, shapename, sat_dir, id_col="UID"):
     cwd = os.path.dirname(os.getcwd())
     model = load_vit(config)
 
@@ -140,7 +140,7 @@ def vit_pred(tiles, config, iso_code, shapename, sat_dir, id_col="UID"):
     out_dir = os.path.join("output", iso_code, "embeddings")
     name = f"{iso_code}_{shapename}"
     embeddings = embed_utils.get_image_embeddings(
-        config, tiles, model, in_dir=sat_dir, out_dir=out_dir, name=name
+        config, data, model, in_dir=sat_dir, out_dir=out_dir, name=name
     )
     if id_col in embeddings.columns:
         embeddings = embeddings.set_index(id_col)
@@ -153,8 +153,8 @@ def vit_pred(tiles, config, iso_code, shapename, sat_dir, id_col="UID"):
 
     # Model prediction
     preds = model.predict(embeddings)
-    tiles["pred"] = preds
-    results = tiles[["UID", "geometry", "shapeName", "pred"]]
+    data["pred"] = preds
+    results = data[["UID", "geometry", "shapeName", "pred"]]
     results = gpd.GeoDataFrame(results, geometry="geometry")
 
     # Save results
