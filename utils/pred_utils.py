@@ -49,7 +49,7 @@ def cnn_predict_images(data, model, config, in_dir, classes):
         image = Image.open(file).convert("RGB")
         transforms = cnn_utils.get_transforms(config["img_size"])
         output = model(transforms["test"](image).to(device).unsqueeze(0))
-        prob = nn.softmax(output, dim=1).detach().numpy()[0]
+        prob = nn.softmax(output, dim=1).detach().cpu().numpy()[0]
         probs.append(prob)
         _, pred = torch.max(output, 1)
         label = str(classes[int(pred[0])])
