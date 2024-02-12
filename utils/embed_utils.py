@@ -54,7 +54,8 @@ def get_image_embeddings(
     out_dir, 
     in_dir=None,
     columns=[],
-    name=None
+    name=None,
+    id_col="UID"
 ):
     files = data_utils.get_image_filepaths(config, data, in_dir)
     if not name: 
@@ -65,11 +66,13 @@ def get_image_embeddings(
     
     if os.path.exists(filename):
         embeddings = pd.read_csv(filename)
+        if id_col in embeddings.columns:
+            embeddings = embeddings.set_index(id_col)
         logging.info(f"Reading file {filename}")
         return embeddings
     
     embeddings = compute_embeddings(files, model, config["image_size"])
-    embeddings = pd.DataFrame(data=embeddings, index=data.UID)
+    embeddings = pd.DataFrame(data=embeddings, index=data[id_col])
 
     for column in columns:
         embeddings[column] = data[column].values
