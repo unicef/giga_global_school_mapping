@@ -63,7 +63,7 @@ def main(iso, config):
     logging.info(f"Train size: {train.shape}")
     
     target = "class"
-    features = [str(x) for x in embeddings.columns[1:-4]]
+    features = [str(x) for x in embeddings.columns[:-len(columns)]]
     classes = list(embeddings[target].unique())
     logging.info(f"No. of features: {len(features)}")
     logging.info(f"Classes: {classes}")
@@ -76,7 +76,7 @@ def main(iso, config):
     model.fit(train[features], train[target].values)
     preds = model.predict(test[features])
 
-    model_file = os.path.join(results_dir, f"{config['config_name']}.pkl")
+    model_file = os.path.join(results_dir, f"{iso}-{config['config_name']}.pkl")
     joblib.dump(model, model_file)
 
     test["pred"] = preds
