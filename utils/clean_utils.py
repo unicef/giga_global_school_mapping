@@ -46,7 +46,7 @@ def _sample_points(
     """
     # Get current working directory
     cwd = os.path.dirname(os.getcwd())
-    points = data_utils.generate_samples(config, iso_code, buffer_size, spacing)
+    points = data_utils._generate_samples(config, iso_code, buffer_size, spacing)
 
     # Read positive data and perform buffer operation on geometries
     filename = f"{iso_code}_{sname}.geojson"
