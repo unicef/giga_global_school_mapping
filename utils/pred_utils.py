@@ -78,7 +78,7 @@ def cnn_predict(data, iso_code, shapename, config, in_dir, n_classes=None):
     - Predictions for the building dataset using the trained model.
     """
     cwd = os.path.dirname(os.getcwd())
-    classes = {0: config["neg_class"], 1: config["pos_class"]}
+    classes = {1: config["pos_class"], 0: config["neg_class"]}
     
     exp_dir = os.path.join(cwd, config["exp_dir"], f"{iso_code}_{config['config_name']}")
     model_file = os.path.join(exp_dir, f"{iso_code}_{config['config_name']}.pth")
@@ -142,8 +142,6 @@ def vit_pred(data, config, iso_code, shapename, sat_dir, id_col="UID"):
     embeddings = embed_utils.get_image_embeddings(
         config, data, model, in_dir=sat_dir, out_dir=out_dir, name=name
     )
-    if id_col in embeddings.columns:
-        embeddings = embeddings.set_index(id_col)
 
     # Load shallow model
     exp_dir = os.path.join(cwd, config["exp_dir"], f"{iso_code}-{config['config_name']}")
