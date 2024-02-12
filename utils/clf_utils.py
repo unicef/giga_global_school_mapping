@@ -24,6 +24,8 @@ from xgboost import XGBClassifier
 from sklearn.svm import LinearSVC, SVC, NuSVC
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.neural_network import MLPClassifier
+from sklearnex import patch_sklearn
+patch_sklearn()
 
 SEED = 42
 SCALERS = {
