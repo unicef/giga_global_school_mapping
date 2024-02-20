@@ -17,11 +17,11 @@ pd.options.mode.chained_assignment = None
 logging.basicConfig(level=logging.INFO)
 
 
-def get_image_filepaths(config, data, in_dir=None):
+def get_image_filepaths(config, data, in_dir=None, ext=".tiff"):
     filepaths = []
     cwd = os.path.dirname(os.getcwd())
     for index, row in data.iterrows():
-        file = f"{row['UID']}.tiff"
+        file = f"{row['UID']}{ext}"
         if not in_dir:
             filepath = os.path.join(
                 cwd, 
@@ -241,21 +241,22 @@ def _get_geoboundaries(config, iso_code, out_dir=None, adm_level="ADM0"):
     if not os.path.exists(out_dir):
         out_dir = _makedir(out_dir)
 
-    try:
-        url = f"{config['gbhumanitarian_url']}{iso_code}/{adm_level}/"
-        r = requests.get(url)
-        download_path = r.json()["gjDownloadURL"]
-    except:
-        url = f"{config['gbopen_url']}{iso_code}/ADM0/"
-        r = requests.get(url)
-        download_path = r.json()["gjDownloadURL"]
-
     # Save the result as a GeoJSON
     filename = f"{iso_code}_geoboundary.geojson"
     out_file = os.path.join(out_dir, filename)
-    geoboundary = requests.get(download_path).json()
-    with open(out_file, "w") as file:
-        geojson.dump(geoboundary, file)
+
+    if not os.path.exists(out_file):
+        try:
+            url = f"{config['gbhumanitarian_url']}{iso_code}/{adm_level}/"
+            r = requests.get(url)
+            download_path = r.json()["gjDownloadURL"]
+        except:
+            url = f"{config['gbopen_url']}{iso_code}/ADM0/"
+            r = requests.get(url)
+            download_path = r.json()["gjDownloadURL"]  
+        geoboundary = requests.get(download_path).json()
+        with open(out_file, "w") as file:
+            geojson.dump(geoboundary, file)
 
     # Read data using GeoPandas
     geoboundary = gpd.read_file(out_file)
