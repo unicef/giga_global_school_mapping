@@ -12,7 +12,6 @@ import torch
 import cnn_utils
 import data_utils
 import config_utils
-import pred_utils
 import embed_utils
 
 import torch
@@ -100,22 +99,22 @@ def compare_cams(filepath, model, model_config, classes, model_file):
     # GradCAM
     model = pred_utils.load_cnn(model_config, classes, model_file, verbose=False).eval()
     cam_extractor = GradCAM(model)
-    pred_utils.generate_cam(model_config, filepath, model, cam_extractor, title="GradCAM")
+    generate_cam(model_config, filepath, model, cam_extractor, title="GradCAM")
     
     # GradCAM++
     model = pred_utils.load_cnn(model_config, classes, model_file, verbose=False).eval()
     cam_extractor = GradCAMpp(model)
-    pred_utils.generate_cam(model_config, filepath, model, cam_extractor, title="GradCAM++")
+    generate_cam(model_config, filepath, model, cam_extractor, title="GradCAM++")
     
     # LayerCAM
     model = pred_utils.load_cnn(model_config, classes, model_file, verbose=False).eval()
     cam_extractor = LayerCAM(model)
-    pred_utils.generate_cam(model_config, filepath, model, cam_extractor, title="LayerCAM")
+    generate_cam(model_config, filepath, model, cam_extractor, title="LayerCAM")
     
     # SmoothGradCAMpp
     model = pred_utils.load_cnn(model_config, classes, model_file, verbose=False).eval()
     cam_extractor = SmoothGradCAMpp(model)
-    pred_utils.generate_cam(model_config, filepath, model, cam_extractor, title="SmoothGradCAM++");
+    generate_cam(model_config, filepath, model, cam_extractor, title="SmoothGradCAM++");
 
 
 def generate_bbox_from_cam(cam_map, image, buffer=50):
@@ -158,7 +157,6 @@ def generate_cam(config, filepath, model, cam_extractor, show=True, title="", fi
     for name, cam in zip(cam_extractor.target_names, cams):
         cam_map = cam.squeeze(0)
         result = overlay_mask(image, to_pil_image(cam_map, mode='F'), alpha=0.5)
-
     bbox, draw_bbox = generate_bbox_from_cam(cam_map, image)
 
     if show:

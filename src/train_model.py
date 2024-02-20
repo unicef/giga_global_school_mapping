@@ -41,14 +41,11 @@ def main(iso, config):
     results_dir = os.path.join(cwd, config["exp_dir"], exp_name)
     if not os.path.exists(results_dir):
         os.makedirs(results_dir)
-    
-    model = torch.hub.load("facebookresearch/dinov2", config["embed_model"])
-    model.name = config["embed_model"]
-    device = torch.device('cuda' if torch.cuda.is_available() else "cpu")
-    model.to(device)
 
+    model = embed_utils.load_model(config)
     data = model_utils.load_data(config, attributes=["rurban", "iso"], verbose=True)
     columns = ["iso", "rurban", "dataset", "class"]
+
     out_dir = os.path.join(config["vectors_dir"], "embeddings")
     embeddings = embed_utils.get_image_embeddings(
         config, data, model, out_dir, in_dir=None, columns=columns
@@ -68,6 +65,7 @@ def main(iso, config):
     logging.info(f"No. of features: {len(features)}")
     logging.info(f"Classes: {classes}")
 
+    logging.info("Training model...")
     cv = model_utils.model_trainer(c, train, features, target)
     logging.info(f"Best estimator: {cv.best_estimator_}")
     logging.info(f"Best CV score: {cv.best_score_}")

@@ -10,16 +10,55 @@ import pandas as pd
 
 import cv2
 import torch
+import torch.nn as nn
 from torchvision import transforms
 from PIL import Image, ImageFile
+from foundation import Foundation
 
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 import random
 SEED = 42
 
-device = torch.device('cuda' if torch.cuda.is_available() else "cpu")
-    
+device = torch.device('cuda' if torch.cuda.is_available() else "cpu")  
+cwd = os.path.dirname(os.getcwd())
+
+def load_model(config):    
+    if "dinov2" in config["embed_model"]:
+        model = torch.hub.load("facebookresearch/dinov2", config["embed_model"])
+        model.name = config["embed_model"]
+        device = torch.device('cuda' if torch.cuda.is_available() else "cpu")
+        model.eval()
+        model.to(device)
+        
+    elif "esa" in config["embed_model"]:
+        model_file = os.path.join(cwd, f"models/foundation_local_v03_e011.pt")
+        model = Foundation(
+            input_dim=config["input_dim"],
+            depths=config["depths"], 
+            dims=config["dims"],
+            img_size=config["image_size"],
+            latent_dim=config["latent_dim"],
+            dropout=config["dropout"],
+            activation=nn.ReLU6(),
+        )
+        model.name = config["embed_model"]
+        device = torch.device('cuda' if torch.cuda.is_available() else "cpu")
+        model.load_state_dict(torch.load(model_file, map_location=device), strict=False)
+        model.eval()
+    return model
+
+def load_image_esa(image_file, image_size) -> torch.Tensor:
+    """
+    Load an image and return a tensor that can be used as an input to DINOv2.
+    """
+    image = Image.open(image_file).convert('RGB')
+    image = image.resize((image_size, image_size))
+    image = np.array(image).transpose((2, 1, 0))
+    image = image[:3, :, :] 
+    tensor = torch.tensor(image, dtype=torch.float32, device=device) / 255.0 # convert to tensor
+    return tensor.unsqueeze(0)
+
 
 def load_image(image_file, image_size) -> torch.Tensor:
     """
@@ -41,9 +80,16 @@ def compute_embeddings(files, model, image_size):
     with torch.no_grad():
         pbar = data_utils._create_progress_bar(files)
         for file in pbar:
-            embedding = model(load_image(file, image_size).to(device))
-            embedding = np.array(embedding[0].cpu().numpy()).reshape(1, -1)[0]
+            if "dinov2" in model.name:
+                image = load_image(file, image_size).to(device)
+                embedding = model(image)
+                embedding = np.array(embedding[0].cpu().numpy()).reshape(1, -1)[0]
+            elif "esa" in model.name:
+                image = load_image_esa(file, image_size).to(device)
+                _, embedding, _, _ = model(image)
+                embedding = embedding[0, :].cpu().detach().float().numpy().tolist()
             embeddings.append(embedding)
+            
     return embeddings
 
 
@@ -65,10 +111,10 @@ def get_image_embeddings(
     filename = os.path.join(out_dir, f"{name}_{model.name}_embeds.csv")
     
     if os.path.exists(filename):
+        logging.info(f"Reading file {filename}")
         embeddings = pd.read_csv(filename)
         if id_col in embeddings.columns:
             embeddings = embeddings.set_index(id_col)
-        logging.info(f"Reading file {filename}")
         return embeddings
     
     embeddings = compute_embeddings(files, model, config["image_size"])
