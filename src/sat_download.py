@@ -103,7 +103,8 @@ def download_sat_images(
                 )
                 with open(image_file, "wb") as file:
                     file.write(img.read())
-            except:
+            except Exception as e: 
+                #logging.info(e)
                 pass
 
 
