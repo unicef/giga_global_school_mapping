@@ -208,7 +208,7 @@ def cnn_predict_images(data, model, config, in_dir, classes):
     return data
 
 
-def cnn_predict(data, iso_code, shapename, config, in_dir, n_classes=None):
+def cnn_predict(data, iso_code, shapename, config, in_dir=None, out_dir=None, n_classes=None):
     """
     Predicts classes for buildings using a trained model and input image file.
 
@@ -229,14 +229,16 @@ def cnn_predict(data, iso_code, shapename, config, in_dir, n_classes=None):
     model_file = os.path.join(exp_dir, f"{iso_code}_{config['config_name']}.pth")
     model = load_cnn(config, classes, model_file)
 
-    out_dir = os.path.join("output", iso_code, "results")
-    out_dir = data_utils._makedir(out_dir)
-    name = f"{iso_code}_{shapename}"
-    
-    out_file = os.path.join(out_dir, f"{name}_{config['config_name']}_results.gpkg")
     results = cnn_predict_images(data, model, config, in_dir, classes)
     results = results[["UID", "geometry", "shapeName", "pred", "prob"]]
     results = gpd.GeoDataFrame(results, geometry="geometry")
+    
+    if not out_dir:
+        out_dir = os.path.join("output", iso_code, "results")
+        out_dir = data_utils._makedir(out_dir)
+    
+    name = f"{iso_code}_{shapename}"
+    out_file = os.path.join(out_dir, f"{name}_{config['config_name']}_results.gpkg")
     results.to_file(out_file, driver="GPKG")
     
     return results

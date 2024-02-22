@@ -36,11 +36,6 @@ def main(args):
     tiles = pred_utils.generate_pred_tiles(
         data_config, iso_code, args.spacing, args.buffer_size, args.adm_level, args.shapename
     ).reset_index()
-    tiles["UID"] = list(tiles.index)
-    
-    out_dir = data_utils._makedir(os.path.join(cwd, "output", iso_code, "tiles"))
-    out_file = os.path.join(out_dir, f"{iso_code}_{args.shapename}.gpkg")
-    tiles[["geometry"]].to_file(out_file, driver="GPKG")
     logging.info(f"Total tiles: {tiles.shape}")
     
     data = tiles.copy()
@@ -68,7 +63,7 @@ if __name__ == "__main__":
     parser.add_argument("--data_config", help="Data config file")
     parser.add_argument("--model_config", help="Model config file")
     parser.add_argument("--sat_config", help="Maxar config file")
-    parser.add_argument("--creds", help="Credentials file")
+    parser.add_argument("--sat_creds", help="Credentials file")
     parser.add_argument("--shapename", help="Model shapename")
     parser.add_argument("--adm_level", help="Admin level", default="ADM2")
     parser.add_argument("--spacing", help="Tile spacing", default=150)
