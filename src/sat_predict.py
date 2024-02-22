@@ -28,7 +28,7 @@ def main(args):
     data_config = config_utils.load_config(data_config_file)
     
     sat_config_file = os.path.join(cwd, args.sat_config)
-    sat_creds_file = os.path.join(cwd, args.creds)
+    sat_creds_file = os.path.join(cwd, args.sat_creds)
     
     sat_config = config_utils.load_config(sat_config_file)
     sat_creds = config_utils.create_config(sat_creds_file)
