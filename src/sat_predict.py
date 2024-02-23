@@ -55,7 +55,8 @@ def main(args):
         )
         schools = results[results["pred"] == "school"]
         pred_utils.georeference_images(schools, sat_config, sat_dir, geotiff_dir)
-        
+
+        classes = {1: model_config["pos_class"], 0: model_config["neg_class"]}
         model = pred_utils.load_cnn(model_config, classes, model_file, verbose=False).eval()
         cam_extractor = LayerCAM(model)
         results = pred_utils.generate_cam_bboxes(
