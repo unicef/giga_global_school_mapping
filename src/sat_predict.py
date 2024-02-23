@@ -16,6 +16,7 @@ import data_utils
 import config_utils
 import pred_utils
 import embed_utils
+from torchcam.methods import LayerCAM
 
 logging.basicConfig(level=logging.INFO)
 
@@ -46,10 +47,28 @@ def main(args):
     model_config_file = os.path.join(cwd, args.model_config)
     model_config = config_utils.load_config(model_config_file)
 
+    geotiff_dir = data_utils._makedir(os.path.join("output", iso_code, "geotiff", args.shapename))
+
     if "cnn" in model_config_file:
         results = pred_utils.cnn_predict(
             tiles, iso_code, args.shapename, model_config, sat_dir, n_classes=2
         )
+        schools = results[results["pred"] == "school"]
+        pred_utils.georeference_images(schools, sat_config, sat_dir, geotiff_dir)
+        
+        model = pred_utils.load_cnn(model_config, classes, model_file, verbose=False).eval()
+        cam_extractor = LayerCAM(model)
+        results = pred_utils.generate_cam_bboxes(
+            schools.reset_index(drop=True), 
+            model_config,
+            geotiff_dir, 
+            model, 
+            cam_extractor
+        )
+        out_dir = os.path.join(cwd, "output", iso_code, "results")
+        filename = f"{iso_code}_{args.shapename}_{model_config['model']}_cam.gpkg"
+        out_file = os.path.join(out_dir, filename)
+        results.to_file(out_file, driver="GPKG")
     else:
         results = pred_utils.vit_pred(
             tiles, model_config, iso_code, args.shapename, sat_dir
