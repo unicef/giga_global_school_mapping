@@ -36,6 +36,21 @@ logging.basicConfig(level=logging.INFO)
 
 
 def generate_cam_bboxes(data, config, in_dir, model, cam_extractor, show=False):
+    """
+    Generate bounding boxes around regions of interest using Class Activation Maps (CAM).
+
+    Args:
+    - data (pandas.DataFrame): DataFrame containing image data.
+    - config (dict): Configuration parameters.
+    - in_dir (str): Input directory path.
+    - model (torch model): Trained model for generating CAM.
+    - cam_extractor (torchcam method): Model used for extracting CAM.
+    - show (bool, optional): Whether to display the generated bounding boxes on the images. Defaults to False.
+
+    Returns:
+    - gpd.GeoDataFrame: DataFrame containing polygons representing the bounding boxes along with probabilities.
+    """
+    
     results = []
     data = data.reset_index(drop=True)
     filepaths = data_utils.get_image_filepaths(config, data, in_dir, ext=".tif")
@@ -97,22 +112,22 @@ def georeference_images(data, config, in_dir, out_dir):
 
 def compare_cams(filepath, model, model_config, classes, model_file):
     # GradCAM
-    model = pred_utils.load_cnn(model_config, classes, model_file, verbose=False).eval()
+    model = load_cnn(model_config, classes, model_file, verbose=False).eval()
     cam_extractor = GradCAM(model)
     generate_cam(model_config, filepath, model, cam_extractor, title="GradCAM")
     
     # GradCAM++
-    model = pred_utils.load_cnn(model_config, classes, model_file, verbose=False).eval()
+    model = load_cnn(model_config, classes, model_file, verbose=False).eval()
     cam_extractor = GradCAMpp(model)
     generate_cam(model_config, filepath, model, cam_extractor, title="GradCAM++")
     
     # LayerCAM
-    model = pred_utils.load_cnn(model_config, classes, model_file, verbose=False).eval()
+    model = load_cnn(model_config, classes, model_file, verbose=False).eval()
     cam_extractor = LayerCAM(model)
     generate_cam(model_config, filepath, model, cam_extractor, title="LayerCAM")
     
     # SmoothGradCAMpp
-    model = pred_utils.load_cnn(model_config, classes, model_file, verbose=False).eval()
+    model = load_cnn(model_config, classes, model_file, verbose=False).eval()
     cam_extractor = SmoothGradCAMpp(model)
     generate_cam(model_config, filepath, model, cam_extractor, title="SmoothGradCAM++");
 
