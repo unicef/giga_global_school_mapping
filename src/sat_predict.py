@@ -47,6 +47,8 @@ def main(args):
     model_config_file = os.path.join(cwd, args.model_config)
     model_config = config_utils.load_config(model_config_file)
 
+    exp_dir = os.path.join(cwd, model_config["exp_dir"], f"{iso_code}_{model_config['config_name']}")
+    model_file = os.path.join(exp_dir, f"{iso_code}_{model_config['config_name']}.pth")
     geotiff_dir = data_utils._makedir(os.path.join("output", iso_code, "geotiff", args.shapename))
 
     if "cnn" in model_config_file:
