@@ -166,7 +166,7 @@ def generate_cam(config, filepath, model, cam_extractor, show=True, title="", fi
 
     image = Image.open(filepath).convert("RGB")
     transforms = cnn_utils.get_transforms(config["img_size"])
-    output = model(transforms["test"](image).unsqueeze(0))
+    output = model(transforms["test"](image).to(device).unsqueeze(0))
     
     cams = cam_extractor(output.squeeze(0).argmax().item(), output)
     for name, cam in zip(cam_extractor.target_names, cams):
