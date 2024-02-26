@@ -373,6 +373,8 @@ def generate_pred_tiles(config, iso_code, spacing, buffer_size, adm_level="ADM2"
     cwd = os.path.dirname(os.getcwd())
     out_dir = data_utils._makedir(os.path.join(cwd, "output", iso_code, "tiles"))
     out_file = os.path.join(out_dir, f"{iso_code}_{shapename}.gpkg")
+    if os.path.exists(out_file):
+        return gpd.read_file(out_file)
     
     points = data_utils._generate_samples(
         config, 
