@@ -278,7 +278,7 @@ def cnn_predict(data, iso_code, shapename, config, in_dir=None, out_dir=None, n_
     model = load_cnn(config, classes, model_file)
 
     results = cnn_predict_images(data, model, config, in_dir, classes)
-    results = results[["UID", "geometry", "shapeName", "pred", "prob"]]
+    results = results[["UID", "geometry", "pred", "prob"]]
     results = gpd.GeoDataFrame(results, geometry="geometry")
     results.to_file(out_file, driver="GPKG")
     return results
