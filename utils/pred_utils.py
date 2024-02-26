@@ -392,6 +392,6 @@ def generate_pred_tiles(config, iso_code, spacing, buffer_size, adm_level="ADM2"
 
     filtered = filter_by_ms(iso_code, config, points)
     filtered["UID"] = list(filtered.index)
-    filtered[["geometry"]].to_file(out_file, driver="GPKG")
+    filtered[["UID", "geometry"]].to_file(out_file, driver="GPKG")
 
     return filtered
