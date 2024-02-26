@@ -156,7 +156,7 @@ def compare_cams(filepath, model, model_config, classes, model_file):
     generate_cam(model_config, filepath, model, cam_extractor, title="SmoothGradCAM++");
 
 
-def generate_bbox_from_cam(cam_map, image, buffer=50):
+def generate_bbox_from_cam(cam_map, image, buffer=75):
     cam_arr = np.array(cam_map.cpu())
     ten_map = torch.tensor(cam_arr)
     values = []
