@@ -35,7 +35,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 logging.basicConfig(level=logging.INFO)
 
 
-def cam_predict(config, data, geotiff_dir, out_file):
+def cam_predict(iso_code, config, data, geotiff_dir, out_file):
     cwd = os.path.dirname(os.getcwd())
     classes = {1: config["pos_class"], 0: config["neg_class"]}
     
@@ -260,8 +260,17 @@ def cnn_predict(data, iso_code, shapename, config, in_dir=None, out_dir=None, n_
     - Predictions for the building dataset using the trained model.
     """
     cwd = os.path.dirname(os.getcwd())
-    classes = {1: config["pos_class"], 0: config["neg_class"]}
+    if not out_dir:
+        out_dir = os.path.join("output", iso_code, "results")
+        out_dir = data_utils._makedir(out_dir)
     
+    name = f"{iso_code}_{shapename}"
+    out_file = os.path.join(out_dir, f"{name}_{config['config_name']}_results.gpkg")
+
+    if os.path.exists(out_file):
+        return gpd.read_file(out_file)
+    
+    classes = {1: config["pos_class"], 0: config["neg_class"]}
     exp_dir = os.path.join(cwd, config["exp_dir"], f"{iso_code}_{config['config_name']}")
     model_file = os.path.join(exp_dir, f"{iso_code}_{config['config_name']}.pth")
     model = load_cnn(config, classes, model_file)
@@ -269,15 +278,7 @@ def cnn_predict(data, iso_code, shapename, config, in_dir=None, out_dir=None, n_
     results = cnn_predict_images(data, model, config, in_dir, classes)
     results = results[["UID", "geometry", "shapeName", "pred", "prob"]]
     results = gpd.GeoDataFrame(results, geometry="geometry")
-    
-    if not out_dir:
-        out_dir = os.path.join("output", iso_code, "results")
-        out_dir = data_utils._makedir(out_dir)
-    
-    name = f"{iso_code}_{shapename}"
-    out_file = os.path.join(out_dir, f"{name}_{config['config_name']}_results.gpkg")
     results.to_file(out_file, driver="GPKG")
-    
     return results
 
 

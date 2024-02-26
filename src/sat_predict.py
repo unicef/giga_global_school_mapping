@@ -55,7 +55,7 @@ def main(args):
         subdata = results[results["pred"] == model_config["pos_class"]]
         pred_utils.georeference_images(subdata, sat_config, sat_dir, geotiff_dir)
         out_file = f"{iso_code}_{args.shapename}_{model_config['model']}_cam.gpkg"
-        pred_utils.cam_predict(model_config, subdata, geotiff_dir, out_file)
+        pred_utils.cam_predict(iso_code, model_config, subdata, geotiff_dir, out_file)
     else:
         results = pred_utils.vit_pred(
             tiles, model_config, iso_code, args.shapename, sat_dir
