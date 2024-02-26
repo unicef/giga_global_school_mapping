@@ -52,7 +52,7 @@ def cam_predict(iso_code, config, data, geotiff_dir, out_file):
         cam_extractor
     )
     results = filter_by_ms(iso_code, config, results)
-    results = data_utils._connect_components(results, buffer_size)
+    results = data_utils._connect_components(results, buffer_size=0)
     results = results.sort_values("prob", ascending=False).drop_duplicates(["group"])
     out_dir = os.path.join(cwd, "output", iso_code, "results")
     results.to_file(os.path.join(out_dir, out_file), driver="GPKG")
