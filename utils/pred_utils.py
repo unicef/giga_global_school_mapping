@@ -35,6 +35,28 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 logging.basicConfig(level=logging.INFO)
 
 
+def cam_predict(config, data, geotiff_dir, out_file):
+    cwd = os.path.dirname(os.getcwd())
+    classes = {1: config["pos_class"], 0: config["neg_class"]}
+    
+    exp_dir = os.path.join(cwd, config["exp_dir"], f"{iso_code}_{config['config_name']}")
+    model_file = os.path.join(exp_dir, f"{iso_code}_{config['config_name']}.pth")
+    model = pred_utils.load_cnn(config, classes, model_file, verbose=False).eval()
+    
+    cam_extractor = LayerCAM(model)
+    results = generate_cam_bboxes(
+        data.reset_index(drop=True), 
+        config,
+        geotiff_dir, 
+        model, 
+        cam_extractor
+    )
+    results = filter_by_ms(iso_code, model_config, results)
+    out_dir = os.path.join(cwd, "output", iso_code, "results")
+    results.to_file(os.path.join(out_dir, out_file), driver="GPKG")
+    return results
+
+
 def generate_cam_bboxes(data, config, in_dir, model, cam_extractor, show=False):
     """
     Generate bounding boxes around regions of interest using Class Activation Maps (CAM).
@@ -328,6 +350,24 @@ def vit_pred(data, config, iso_code, shapename, sat_dir, id_col="UID"):
     return results
 
 
+def filter_by_ms(iso_code, config, data):
+    filtered = []
+    cwd = os.path.dirname(os.getcwd())
+    ms_dir = os.path.join(cwd, config["vectors_dir"], "ms_buildings", iso_code)
+    pbar = data_utils._create_progress_bar(os.listdir(ms_dir))
+    for file in pbar:
+        filename = os.path.join(ms_dir, file)
+        ms = gpd.read_file(filename)
+        ms = ms.to_crs(data.crs)
+        filtered.append(
+            gpd.sjoin(data, ms, predicate='intersects', how="inner")
+        )
+        
+    filtered = gpd.GeoDataFrame(pd.concat(filtered), geometry="geometry")
+    filtered = filtered.drop_duplicates("geometry", keep="first")
+    return filtered
+
+
 def generate_pred_tiles(config, iso_code, spacing, buffer_size, adm_level="ADM2", shapename=None):
     cwd = os.path.dirname(os.getcwd())
     out_dir = data_utils._makedir(os.path.join(cwd, "output", iso_code, "tiles"))
@@ -344,19 +384,7 @@ def generate_pred_tiles(config, iso_code, spacing, buffer_size, adm_level="ADM2"
     points["points"] = points["geometry"]
     points["geometry"] = points.buffer(buffer_size, cap_style=3)
 
-    filtered = []
-    ms_dir = os.path.join(cwd, config["vectors_dir"], "ms_buildings", iso_code)
-    pbar = data_utils._create_progress_bar(os.listdir(ms_dir))
-    for file in pbar:
-        filename = os.path.join(ms_dir, file)
-        ms = gpd.read_file(filename)
-        ms = ms.to_crs(points.crs)
-        filtered.append(
-            gpd.sjoin(points, ms, predicate='intersects', how="inner")
-        )
-        
-    filtered = gpd.GeoDataFrame(pd.concat(filtered), geometry="geometry")
-    filtered = filtered.drop_duplicates("geometry", keep="first")
+    filtered = filter_by_ms(iso_code, config, points)
     filtered["UID"] = list(filtered.index)
     filtered[["geometry"]].to_file(out_file, driver="GPKG")
 

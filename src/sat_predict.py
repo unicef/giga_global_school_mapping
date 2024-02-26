@@ -46,32 +46,16 @@ def main(args):
 
     model_config_file = os.path.join(cwd, args.model_config)
     model_config = config_utils.load_config(model_config_file)
-
-    exp_dir = os.path.join(cwd, model_config["exp_dir"], f"{iso_code}_{model_config['config_name']}")
-    model_file = os.path.join(exp_dir, f"{iso_code}_{model_config['config_name']}.pth")
     geotiff_dir = data_utils._makedir(os.path.join("output", iso_code, "geotiff", args.shapename))
 
     if "cnn" in model_config_file:
         results = pred_utils.cnn_predict(
             tiles, iso_code, args.shapename, model_config, sat_dir, n_classes=2
         )
-        schools = results[results["pred"] == "school"]
-        pred_utils.georeference_images(schools, sat_config, sat_dir, geotiff_dir)
-
-        classes = {1: model_config["pos_class"], 0: model_config["neg_class"]}
-        model = pred_utils.load_cnn(model_config, classes, model_file, verbose=False).eval()
-        cam_extractor = LayerCAM(model)
-        results = pred_utils.generate_cam_bboxes(
-            schools.reset_index(drop=True), 
-            model_config,
-            geotiff_dir, 
-            model, 
-            cam_extractor
-        )
-        out_dir = os.path.join(cwd, "output", iso_code, "results")
-        filename = f"{iso_code}_{args.shapename}_{model_config['model']}_cam.gpkg"
-        out_file = os.path.join(out_dir, filename)
-        results.to_file(out_file, driver="GPKG")
+        subdata = results[results["pred"] == model_config["pos_class"]]
+        pred_utils.georeference_images(subdata, sat_config, sat_dir, geotiff_dir)
+        out_file = f"{iso_code}_{args.shapename}_{model_config['model']}_cam.gpkg"
+        pred_utils.cam_predict(model_config, geotiff_dir, out_file)
     else:
         results = pred_utils.vit_pred(
             tiles, model_config, iso_code, args.shapename, sat_dir
