@@ -3,11 +3,11 @@ rasters_dir: 'data/rasters/'
 columns: ['UID', 'source', 'iso', 'country', 'region', 'subregion', 'name', 'geometry', 'giga_id_school']
 
 iso_codes: [
-    'ATG', 'AIA', 'YEM', 'SEN', 'BWA', 'MDG', 'BEN', 'BIH', 'BLZ', 'BRB', 
-    'CRI', 'DMA', 'GHA', 'GIN', 'GRD', 'HND', 'HUN', 'KAZ', 'KEN', 'KIR', 
-    'KNA', 'LCA', 'MNG', 'MSR', 'MWI', 'NAM', 'NER', 'NGA', 'PAN', 'RWA', 
-    'SLE', 'SLV', 'SSD', 'THA', 'TTO', 'UKR', 'UZB', 'VCT', 'VGB', 'ZAF', 
-    'ZWE', 'BRA'
+    'SEN', 'ATG', 'AIA', 'BWA', 'MDG', 'BEN', 'BIH', 'BLZ', 'BRB', 'CRI', 
+    'DMA', 'GHA', 'GIN', 'GRD', 'HND', 'HUN', 'KAZ', 'KEN', 'KIR', 'KNA', 
+    'LCA', 'MNG', 'MSR', 'MWI', 'NAM', 'NER', 'NGA', 'PAN', 'RWA', 'SLE', 
+    'SLV', 'SSD', 'THA', 'TTO', 'UKR', 'UZB', 'VCT', 'VGB', 'ZAF', 'ZWE', 
+    'BRA'
 ]
 
 proximity: 50
@@ -18,52 +18,6 @@ name_match_threshold: 85
 name_match_proximity: 300
 priority: ["OSM", "OVERTURE", "UNICEF"]
 
-ms_dict: {
- 'YEM': 'RepublicofYemen',
- 'SEN': 'Senegal',
- 'MDG': 'Madagascar',
- 'AIA': 'Anguilla',
- 'ATG': 'AntiguaandBarbuda',
- 'BEN': 'Benin',
- 'BIH': 'BosniaandHerzegovina',
- 'BLZ': 'Belize',
- 'BRB': 'Barbados',
- 'BWA': 'Botswana',
- 'CRI': 'CostaRica',
- 'DMA': 'Dominica',
- 'GHA': 'Ghana',
- 'GIN': 'EquatorialGuinea',
- 'GRD': 'Grenada',
- 'HND': 'Honduras',
- 'HUN': 'Hungary',
- 'KAZ': 'Kazakhstan',
- 'KEN': 'Kenya',
- 'KIR': 'Kiribati',
- 'KNA': 'StKittsandNevis',
- 'LCA': 'SaintLucia',
- 'MNG': 'Mongolia',
- 'MSR': 'Montserrat',
- 'MWI': 'Malawi',
- 'NAM': 'Namibia',
- 'NER': 'Niger',
- 'NGA': 'Nigeria',
- 'PAN': 'Panama',
- 'RWA': 'Rwanda',
- 'SLE': 'SierraLeone',
- 'SLV': 'ElSalvador',
- 'SSD': 'SouthSudan',
- 'THA': 'Thailand',
- 'TTO': 'TrinidadandTobago',
- 'UKR': 'Ukraine',
- 'UZB': 'Uzbekistan',
- 'VCT': 'Grenada',
- 'VGB': 'BritishVirginIslands',
- 'ZAF': 'SouthAfrica',
- 'ZWE': 'Zimbabwe',
- 'BRA': 'Brazil'
-}
-
-# Specify school and non-school keywords
 school: {
     amenity: [
         "school",
