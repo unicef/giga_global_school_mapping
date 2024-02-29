@@ -37,12 +37,12 @@ def main(args):
     tiles = pred_utils.generate_pred_tiles(
         data_config, iso_code, args.spacing, args.buffer_size, args.adm_level, args.shapename
     ).reset_index()
+    if 'sum' in tiles.columns:
+        tiles = tiles[tiles["sum"] > args.sum_threshold].reset_index(drop=True)
     logging.info(f"Total tiles: {tiles.shape}")
     
     data = tiles.copy()
     data["geometry"] = data["points"]
-    if 'sum' in data.columns:
-        data = data[data["sum"] > args.sum_threshold].reset_index(drop=True)
     sat_dir = os.path.join(cwd, "output", iso_code, "images", args.shapename)
     sat_download.download_sat_images(sat_creds, sat_config, data=data, out_dir=sat_dir)
 
