@@ -36,7 +36,7 @@ def main(args):
 
     tiles = pred_utils.generate_pred_tiles(
         data_config, iso_code, args.spacing, args.buffer_size, args.adm_level, args.shapename
-    ).reset_index()
+    ).reset_index(drop=True)
     if 'sum' in tiles.columns:
         tiles = tiles[tiles["sum"] > args.sum_threshold].reset_index(drop=True)
     logging.info(f"Total tiles: {tiles.shape}")

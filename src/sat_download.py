@@ -24,7 +24,6 @@ def download_sat_images(
     config,
     category=None,
     iso=None,
-    sum_threshold=5,
     sample_size=None,
     src_crs="EPSG:4326",
     id_col="UID",
@@ -66,8 +65,6 @@ def download_sat_images(
         data = data[data["validated"] == 0]
     if 'iso' in data.columns:
         data = data[data["iso"] == iso].reset_index(drop=True)
-    if 'sum' in data.columns:
-        data = data[data["sum"] > sum_threshold].reset_index(drop=True)
     if sample_size:
         data = data.iloc[:sample_size]
 
