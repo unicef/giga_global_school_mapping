@@ -41,6 +41,8 @@ def main(args):
     
     data = tiles.copy()
     data["geometry"] = data["points"]
+    if 'sum' in data.columns:
+        data = data[data["sum"] > args.sum_threshold].reset_index(drop=True)
     sat_dir = os.path.join(cwd, "output", iso_code, "images", args.shapename)
     sat_download.download_sat_images(sat_creds, sat_config, data=data, out_dir=sat_dir)
 
@@ -74,6 +76,7 @@ if __name__ == "__main__":
     parser.add_argument("--adm_level", help="Admin level", default="ADM2")
     parser.add_argument("--spacing", help="Tile spacing", default=150)
     parser.add_argument("--buffer_size", help="Buffer size", default=150)
+    parser.add_argument("--sum_threshold", help="Pixel sum threshold", default=5)
     parser.add_argument("--iso", help="ISO code")
     args = parser.parse_args()
     logging.info(args)
