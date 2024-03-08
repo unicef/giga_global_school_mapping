@@ -58,7 +58,7 @@ def save_results(test, target, pos_class, classes, results_dir, prefix=None, log
     results = evaluate(test[target], test["pred"], pos_class)
     cm = get_confusion_matrix(test[target], test["pred"], classes)
     
-   _save_results(results, cm, results_dir)
+    _save_results(results, cm, results_dir)
     
     if prefix: 
         results = {f"{prefix}_{key}": val for key, val in results.items()}
