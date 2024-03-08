@@ -363,6 +363,16 @@ def get_model(model_type, n_classes, dropout=0):
     if "xception" in model_type:
         model = timm.create_model('xception', pretrained=True, num_classes=n_classes)
 
+    if "convnext" in model_type:
+        if "small" in model_type:
+            model = models.convnext_small(weights='IMAGENET1K_V1')
+        elif "base" in model_type:
+            model = models.convnext_base(weights='IMAGENET1K_V1')
+        elif "large" in model_type:
+            model = models.convnext_large(weights='IMAGENET1K_V1')
+        num_ftrs = model.classifier[2].in_features
+        model.classifier[2] = nn.Linear(num_ftrs, n_classes)
+    
     return model
 
 
