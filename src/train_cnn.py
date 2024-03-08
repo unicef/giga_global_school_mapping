@@ -101,7 +101,7 @@ def main(c):
             best_score = val_results["f1_score"]
             best_weights = model.state_dict()
 
-            eval_utils.save_results(val_results, val_cm, exp_dir)
+            eval_utils.save_results(val_results, val_cm, exp_dir, classes, exp_dir)
             model_file = os.path.join(exp_dir, f"{exp_name}.pth")
             torch.save(model.state_dict(), model_file)
         logging.info(f"Best F1 score: {best_score}")
@@ -131,7 +131,7 @@ def main(c):
     )
 
     # Save results in experiment directory
-    eval_utils.save_results(test_results, test_cm, exp_dir)
+    eval_utils.save_results(test_results, test_cm, classes, exp_dir)
 
 
 if __name__ == "__main__":
