@@ -17,6 +17,27 @@ from sklearn.metrics import (
 json.fallback_table[np.ndarray] = lambda array: array.tolist()
 
 
+def _save_results(results, cm, exp_dir):
+    """
+    Save evaluation results and confusion matrix to the specified directory.
+    Args:
+    - results (dict): Evaluation results to be saved as JSON.
+    - cm (tuple): Tuple containing confusion matrix components (DataFrame, DataFrame, str).
+    - exp_dir (str): Directory path to save the results.
+    Saves:
+    - "results.json": JSON file containing the evaluation results.
+    - "confusion_matrix.csv": CSV file containing the confusion matrix data.
+    - "cm_metrics.csv": CSV file containing metrics derived from the confusion matrix.
+    - "cm_report.log": Log file containing the detailed confusion matrix report.
+    """
+
+    with open(os.path.join(exp_dir, "results.json"), "w") as f:
+        json.dump(results, f)
+    cm[0].to_csv(os.path.join(exp_dir, "confusion_matrix.csv"))
+    cm[1].to_csv(os.path.join(exp_dir, "cm_metrics.csv"))
+    open(os.path.join(exp_dir, "cm_report.log"), "a").write(cm[2])
+
+
 def save_results(test, target, pos_class, classes, results_dir, prefix=None, log=True):
     """
     Save evaluation results and confusion matrix to the specified directory.
@@ -37,11 +58,7 @@ def save_results(test, target, pos_class, classes, results_dir, prefix=None, log
     results = evaluate(test[target], test["pred"], pos_class)
     cm = get_confusion_matrix(test[target], test["pred"], classes)
     
-    with open(os.path.join(results_dir, "results.json"), "w") as f:
-        json.dump(results, f)
-    cm[0].to_csv(os.path.join(results_dir, "confusion_matrix.csv"))
-    cm[1].to_csv(os.path.join(results_dir, "cm_metrics.csv"))
-    open(os.path.join(results_dir, "cm_report.log"), "a").write(cm[2])
+   _save_results(results, cm, results_dir)
     
     if prefix: 
         results = {f"{prefix}_{key}": val for key, val in results.items()}

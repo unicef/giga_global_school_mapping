@@ -355,7 +355,7 @@ def vit_pred(data, config, iso_code, shapename, sat_dir, id_col="UID"):
     return results
 
 
-def filter_by_buildings(iso_code, config, data):
+def filter_by_buildings(iso_code, config, data, miniters=1000):
     cwd = os.path.dirname(os.getcwd())
     raster_dir = os.path.join(cwd, config["rasters_dir"])
     ms_path = os.path.join(raster_dir, "ms_buildings", f"{iso_code}_ms.tif")
@@ -363,12 +363,15 @@ def filter_by_buildings(iso_code, config, data):
     ghsl_path = os.path.join(raster_dir, "ghsl", config["ghsl_built_c_file"])
 
     pixel_sums = []
-    pbar = tqdm(range(len(data)), total=len(data))
+    bar_format = "{l_bar}{bar:20}{r_bar}{bar:-20b}"
+    pbar = tqdm(
+        range(len(data)), 
+        total=len(data), 
+        miniters=int(len(data)/miniters),
+        bar_format=bar_format
+    )
     for index in pbar:
-        description = f"Processing {iso_code} {index}/{len(data)}"
-        pbar.set_description(description)
         subdata = data.iloc[[index]]
-        
         pixel_sum = 0
         with rio.open(ms_path) as src:
             try:
@@ -416,7 +419,7 @@ def generate_pred_tiles(config, iso_code, spacing, buffer_size, adm_level="ADM2"
     points["points"] = points["geometry"]
     points["geometry"] = points.buffer(buffer_size, cap_style=3)
     points["UID"] = list(points.index)
-
+    
     filtered = filter_by_buildings(iso_code, config, points)
     filtered = filtered[["UID", "geometry", "shapeName", "sum"]]
     filtered.to_file(out_file, driver="GPKG", index=False)
