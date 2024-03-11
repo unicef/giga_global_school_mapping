@@ -47,6 +47,7 @@ def main(args):
         shapenames = geoboundary.shapeName.unique()
     
     for shapename in shapenames:
+        logging.info(f"Processing {shapename}")
         tiles = pred_utils.generate_pred_tiles(
             data_config, iso_code, args.spacing, args.buffer_size, args.adm_level, shapename
         ).reset_index(drop=True)
