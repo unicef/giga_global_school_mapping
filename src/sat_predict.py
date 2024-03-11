@@ -37,7 +37,7 @@ def main(args):
     model_config_file = os.path.join(cwd, args.model_config)
     model_config = config_utils.load_config(model_config_file)
 
-    geoboundary_dir = os.path.join(cwd, args.data_config["vectors_dir"], "geoboundaries")
+    geoboundary_dir = os.path.join(cwd, data_config["vectors_dir"], "geoboundaries")
     geoboundary_file = os.path.join(geoboundary_dir, f"{iso_code}_geoboundary.geojson")
     geoboundary = gpd.read_file(geoboundary_file)
 
