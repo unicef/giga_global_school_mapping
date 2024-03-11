@@ -405,7 +405,6 @@ def generate_pred_tiles(config, iso_code, spacing, buffer_size, adm_level="ADM2"
     
     if os.path.exists(out_file):
         data = gpd.read_file(out_file)
-        data["points"] = data["geometry"].centroid
         return data
     
     points = data_utils._generate_samples(
