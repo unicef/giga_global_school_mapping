@@ -46,34 +46,34 @@ def main(args):
     else:
         shapenames = geoboundary.shapeName.unique()
     
-    for shapename in shapenames:
-        logging.info(f"Processing {shapename}...")
+    for shapename in shapenames[:2]:
+        print(f"Processing {shapename}...")
         tiles = pred_utils.generate_pred_tiles(
             data_config, iso_code, args.spacing, args.buffer_size, args.adm_level, shapename
         ).reset_index(drop=True)
         tiles["points"] = tiles["geometry"].centroid
         if 'sum' in tiles.columns:
             tiles = tiles[tiles["sum"] > args.sum_threshold].reset_index(drop=True)
-        logging.info(f"Total tiles: {tiles.shape}")
+        print(f"Total tiles: {tiles.shape}")
         
         data = tiles.copy()
         data["geometry"] = data["points"]
         sat_dir = os.path.join(cwd, "output", iso_code, "images", shapename)
-        logging.info(f"Downloading satellite images for {shapename}...")
+        print(f"Downloading satellite images for {shapename}...")
         sat_download.download_sat_images(sat_creds, sat_config, data=data, out_dir=sat_dir)
     
         geotiff_dir = data_utils._makedir(os.path.join("output", iso_code, "geotiff", shapename))
         if "cnn" in model_config_file:
-            logging.info(f"Generating predictions for {shapename}...")
+            print(f"Generating predictions for {shapename}...")
             results = pred_utils.cnn_predict(
                 tiles, iso_code, shapename, model_config, sat_dir, n_classes=2
             )
             subdata = results[results["pred"] == model_config["pos_class"]]
             
-            logging.info(f"Generating GeoTIFFs for {shapename}...")
+            print(f"Generating GeoTIFFs for {shapename}...")
             pred_utils.georeference_images(subdata, sat_config, sat_dir, geotiff_dir)
 
-            logging.info(f"Generating CAMs for {shapename}...")
+            print(f"Generating CAMs for {shapename}...")
             out_file = f"{iso_code}_{shapename}_{model_config['model']}_cam.gpkg"
             pred_utils.cam_predict(iso_code, model_config, subdata, geotiff_dir, out_file)
         else:
