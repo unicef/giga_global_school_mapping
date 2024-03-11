@@ -39,6 +39,12 @@ logging.basicConfig(level=logging.INFO)
 def cam_predict(iso_code, config, data, geotiff_dir, out_file):
     cwd = os.path.dirname(os.getcwd())
     classes = {1: config["pos_class"], 0: config["neg_class"]}
+
+    out_dir = os.path.join(cwd, "output", iso_code, "results")
+    out_file = os.path.join(out_dir, out_file)
+    if os.path.exists(out_file):
+        return gpd.read_file(out_file)
+    
     
     exp_dir = os.path.join(cwd, config["exp_dir"], f"{iso_code}_{config['config_name']}")
     model_file = os.path.join(exp_dir, f"{iso_code}_{config['config_name']}.pth")
@@ -55,8 +61,7 @@ def cam_predict(iso_code, config, data, geotiff_dir, out_file):
     results = filter_by_buildings(iso_code, config, results)
     results = data_utils._connect_components(results, buffer_size=0)
     results = results.sort_values("prob", ascending=False).drop_duplicates(["group"])
-    out_dir = os.path.join(cwd, "output", iso_code, "results")
-    results.to_file(os.path.join(out_dir, out_file), driver="GPKG")
+    results.to_file(out_file, driver="GPKG")
     return results
 
 
