@@ -57,17 +57,17 @@ def main(args):
         
         data = tiles.copy()
         data["geometry"] = data["points"]
-        sat_dir = os.path.join(cwd, "output", iso_code, "images", args.shapename)
+        sat_dir = os.path.join(cwd, "output", iso_code, "images", shapename)
         sat_download.download_sat_images(sat_creds, sat_config, data=data, out_dir=sat_dir)
     
         geotiff_dir = data_utils._makedir(os.path.join("output", iso_code, "geotiff", shapename))
         if "cnn" in model_config_file:
             results = pred_utils.cnn_predict(
-                tiles, iso_code, args.shapename, model_config, sat_dir, n_classes=2
+                tiles, iso_code, shapename, model_config, sat_dir, n_classes=2
             )
             subdata = results[results["pred"] == model_config["pos_class"]]
             pred_utils.georeference_images(subdata, sat_config, sat_dir, geotiff_dir)
-            out_file = f"{iso_code}_{args.shapename}_{model_config['model']}_cam.gpkg"
+            out_file = f"{iso_code}_{shapename}_{model_config['model']}_cam.gpkg"
             pred_utils.cam_predict(iso_code, model_config, subdata, geotiff_dir, out_file)
         else:
             results = pred_utils.vit_pred(
