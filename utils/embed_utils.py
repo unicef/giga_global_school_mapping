@@ -32,7 +32,11 @@ def load_model(config):
         model.to(device)
         
     elif "esa" in config["embed_model"]:
-        model_file = os.path.join(cwd, f"models/foundation_local_v03_e011.pt")
+        if "v1" in config["embed_model"]:
+            model_file = os.path.join(cwd, f"models/foundation_local_v03_e011.pt")
+        elif "v2" in config["embed_model"]:
+            model_file = os.path.join(cwd, f"models/foundation_geofoundation_precursor-vhr_256_rgb.pt")
+            
         model = Foundation(
             input_dim=config["input_dim"],
             depths=config["depths"], 
