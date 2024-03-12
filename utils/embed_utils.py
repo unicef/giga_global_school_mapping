@@ -49,6 +49,8 @@ def load_model(config):
         model.name = config["embed_model"]
         device = torch.device('cuda' if torch.cuda.is_available() else "cpu")
         model.load_state_dict(torch.load(model_file, map_location=device), strict=False)
+        if torch.cuda.is_available():
+            model.cuda()
         model.eval()
     return model
 
