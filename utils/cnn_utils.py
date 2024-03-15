@@ -252,7 +252,7 @@ def evaluate(data_loader, class_names, model, criterion, device, logging, pos_la
     
     model.eval()
 
-    y_actuals, y_preds = [], []
+    y_actuals, y_preds y_probs = [], [], []
     running_loss = 0.0
     confusion_matrix = torch.zeros(len(class_names), len(class_names))
 
@@ -268,6 +268,7 @@ def evaluate(data_loader, class_names, model, criterion, device, logging, pos_la
         running_loss += loss.item() * inputs.size(0)
         y_actuals.extend(labels.cpu().numpy().tolist())
         y_preds.extend(preds.data.cpu().numpy().tolist())
+        y_probs.extend(probs.data.cpu().numpy().tolist())
 
     epoch_loss = running_loss / len(data_loader)
     epoch_results = eval_utils.evaluate(y_actuals, y_preds, pos_label)
@@ -277,9 +278,9 @@ def evaluate(data_loader, class_names, model, criterion, device, logging, pos_la
         y_actuals, y_preds, class_names
     )
     logging.info(f"Val Loss: {epoch_loss} {epoch_results}")
-    preds = pd.DataFrame({'y_true': y_actuals, 'y_preds': y_preds})
+    preds = pd.DataFrame({'y_true': y_actuals, 'y_preds': y_preds, 'y_probs': y_probs})
     preds["UID"] = preds.index
-    preds = preds[["UID", "y_true", "y_preds"]]
+    preds = preds[["UID", "y_true", "y_preds", "y_probs"]]
 
     if wandb is not None:
         wandb.log({"val_" + k: v for k, v in epoch_results.items()})
