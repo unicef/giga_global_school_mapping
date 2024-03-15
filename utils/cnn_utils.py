@@ -27,7 +27,7 @@ from torchvision.models import (
     VGG16_Weights,
     EfficientNet_B0_Weights,
 )
-import torch.nn.functional as nn
+import torch.nn.functional as nnf
 
 import sys
 sys.path.insert(0, "../utils/")
@@ -264,7 +264,7 @@ def evaluate(data_loader, class_names, model, criterion, device, logging, pos_la
         with torch.set_grad_enabled(False):
             outputs = model(inputs)
             _, preds = torch.max(outputs, 1)
-            probs = nn.softmax(outputs, dim=1)
+            probs = nnf.softmax(outputs, dim=1)
             loss = criterion(outputs, labels)
 
         running_loss += loss.item() * inputs.size(0)
