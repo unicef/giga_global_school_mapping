@@ -19,7 +19,7 @@ from sklearn.metrics import (
 json.fallback_table[np.ndarray] = lambda array: array.tolist()
 
 
-def _save_results(results, cm, exp_dir):
+def _save_files(results, cm, exp_dir):
     """
     Save evaluation results and confusion matrix to the specified directory.
     Args:
@@ -59,8 +59,7 @@ def save_results(test, target, pos_class, classes, results_dir, prefix=None, log
         os.makedirs(results_dir)
     results = evaluate(test[target], test["pred"], pos_class)
     cm = get_confusion_matrix(test[target], test["pred"], classes)
-    
-    _save_results(results, cm, results_dir)
+    _save_files(results, cm, results_dir)
     
     if prefix: 
         results = {f"{prefix}_{key}": val for key, val in results.items()}
