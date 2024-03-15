@@ -252,7 +252,7 @@ def evaluate(data_loader, class_names, model, criterion, device, logging, pos_la
     
     model.eval()
 
-    y_actuals, y_preds y_probs = [], [], []
+    y_actuals, y_preds, y_probs = [], [], []
     running_loss = 0.0
     confusion_matrix = torch.zeros(len(class_names), len(class_names))
 
