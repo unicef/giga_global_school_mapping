@@ -282,6 +282,7 @@ def evaluate(data_loader, class_names, model, criterion, device, logging, pos_la
     confusion_matrix, cm_metrics, cm_report = eval_utils.get_confusion_matrix(
         y_actuals, y_preds, class_names
     )
+    y_probs = [x[0] for x in y_probs]
     logging.info(f"Val Loss: {epoch_loss} {epoch_results}")
     preds = pd.DataFrame({
         'UID': y_uids,
