@@ -81,6 +81,7 @@ class SchoolDataset(Dataset):
         """
         
         item = self.dataset.iloc[index]
+        uid = item["UID"]
         filepath= item["filepath"]
         image = Image.open(filepath).convert("RGB")
 
@@ -89,7 +90,7 @@ class SchoolDataset(Dataset):
 
         y = self.classes[item["class"]]
         image.close()
-        return x, y
+        return x, y, uid
 
     def __len__(self):
         """
@@ -114,7 +115,7 @@ def visualize_data(data, data_loader, phase="test", n=4):
     - n (int, optional): Number of images to visualize in a grid. Defaults to 4.
     """
     
-    inputs, classes = next(iter(data_loader[phase]))
+    inputs, classes, uids = next(iter(data_loader[phase]))
     fig, axes = plt.subplots(n, n, figsize=(6, 6))
 
     key_list = list(data[phase].classes.keys())
@@ -202,7 +203,7 @@ def train(data_loader, model, criterion, optimizer, device, logging, pos_label, 
 
     y_actuals, y_preds = [], []
     running_loss = 0.0
-    for inputs, labels in tqdm(data_loader, total=len(data_loader)):
+    for inputs, labels, _ in tqdm(data_loader, total=len(data_loader)):
         inputs = inputs.to(device)
         labels = labels.to(device)
 
@@ -253,24 +254,26 @@ def evaluate(data_loader, class_names, model, criterion, device, logging, pos_la
     
     model.eval()
 
-    y_actuals, y_preds, y_probs = [], [], []
+    y_uids, y_actuals, y_preds, y_probs = [], [], [], []
     running_loss = 0.0
     confusion_matrix = torch.zeros(len(class_names), len(class_names))
 
-    for inputs, labels in tqdm(data_loader, total=len(data_loader)):
+    for inputs, labels, uids in tqdm(data_loader, total=len(data_loader)):
         inputs = inputs.to(device)
         labels = labels.to(device)
 
         with torch.set_grad_enabled(False):
             outputs = model(inputs)
             _, preds = torch.max(outputs, 1)
-            probs = nnf.softmax(outputs, dim=1)
+            soft_outputs = nnf.softmax(outputs, dim=1)
+            probs, _ = soft_outputs.topk(1, dim=1)
             loss = criterion(outputs, labels)
 
         running_loss += loss.item() * inputs.size(0)
         y_actuals.extend(labels.cpu().numpy().tolist())
         y_preds.extend(preds.data.cpu().numpy().tolist())
         y_probs.extend(probs.data.cpu().numpy().tolist())
+        y_uids.extend(uids)
 
     epoch_loss = running_loss / len(data_loader)
     epoch_results = eval_utils.evaluate(y_actuals, y_preds, pos_label)
@@ -280,9 +283,12 @@ def evaluate(data_loader, class_names, model, criterion, device, logging, pos_la
         y_actuals, y_preds, class_names
     )
     logging.info(f"Val Loss: {epoch_loss} {epoch_results}")
-    preds = pd.DataFrame({'y_true': y_actuals, 'y_preds': y_preds, 'y_probs': y_probs})
-    preds["UID"] = preds.index
-    preds = preds[["UID", "y_true", "y_preds", "y_probs"]]
+    preds = pd.DataFrame({
+        'UID': y_uids,
+        'y_true': y_actuals, 
+        'y_preds': y_preds, 
+        'y_probs': y_probs
+    })
 
     if wandb is not None:
         wandb.log({"val_" + k: v for k, v in epoch_results.items()})
