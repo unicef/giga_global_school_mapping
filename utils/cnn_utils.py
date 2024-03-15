@@ -278,7 +278,7 @@ def evaluate(data_loader, class_names, model, criterion, device, logging, pos_la
     )
     logging.info(f"Val Loss: {epoch_loss} {epoch_results}")
     preds = pd.DataFrame({'y_true': y_actuals, 'y_preds': y_preds})
-    preds["UID"] = pd.index
+    preds["UID"] = preds.index
     preds = preds[["UID", "y_true", "y_preds"]]
 
     if wandb is not None:
