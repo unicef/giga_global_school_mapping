@@ -277,10 +277,13 @@ def evaluate(data_loader, class_names, model, criterion, device, logging, pos_la
         y_actuals, y_preds, class_names
     )
     logging.info(f"Val Loss: {epoch_loss} {epoch_results}")
+    preds = pd.DataFrame({'y_true': y_actuals, 'y_preds': y_preds})
+    preds["UID"] = pd.index
+    preds = preds[["UID", "y_true", "y_preds"]]
 
     if wandb is not None:
         wandb.log({"val_" + k: v for k, v in epoch_results.items()})
-    return epoch_results, (confusion_matrix, cm_metrics, cm_report)
+    return epoch_results, (confusion_matrix, cm_metrics, cm_report), preds
 
 
 def get_transforms(size):
