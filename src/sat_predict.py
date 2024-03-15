@@ -37,14 +37,10 @@ def main(args):
     model_config_file = os.path.join(cwd, args.model_config)
     model_config = config_utils.load_config(model_config_file)
 
-    geoboundary_dir = os.path.join(cwd, data_config["vectors_dir"], "geoboundaries")
-    geoboundary_file = os.path.join(geoboundary_dir, f"{iso_code}_geoboundary.geojson")
-    geoboundary = gpd.read_file(geoboundary_file)
-
-    if args.shapename:
-        shapenames = [shapename]
-    else:
-        shapenames = geoboundary.shapeName.unique()
+    geoboundary = data_utils._get_geoboundaries(
+        data_config, args.iso_code, adm_level="ADM2"
+    )
+    shapenames = [args.shapename] if args.shapename else geoboundary.shapeName.unique()
     
     for shapename in shapenames:
         print(f"Processing {shapename}...")
