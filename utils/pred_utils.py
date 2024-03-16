@@ -58,6 +58,7 @@ def cam_predict(iso_code, config, data, geotiff_dir, out_file):
         model, 
         cam_extractor
     )
+    results["UID"] = data["UID"]
     results = filter_by_buildings(iso_code, config, results)
     results = data_utils._connect_components(results, buffer_size=0)
     results = results.sort_values("prob", ascending=False).drop_duplicates(["group"])
