@@ -38,7 +38,7 @@ def main(args):
     model_config = config_utils.load_config(model_config_file)
 
     geoboundary = data_utils._get_geoboundaries(
-        data_config, args.iso_code, adm_level="ADM2"
+        data_config, args.iso, adm_level="ADM2"
     )
     shapenames = [args.shapename] if args.shapename else geoboundary.shapeName.unique()
     
