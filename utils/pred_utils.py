@@ -45,7 +45,6 @@ def cam_predict(iso_code, config, data, geotiff_dir, out_file):
     if os.path.exists(out_file):
         return gpd.read_file(out_file)
     
-    
     exp_dir = os.path.join(cwd, config["exp_dir"], f"{iso_code}_{config['config_name']}")
     model_file = os.path.join(exp_dir, f"{iso_code}_{config['config_name']}.pth")
     model = load_cnn(config, classes, model_file, verbose=False).eval()
@@ -58,7 +57,6 @@ def cam_predict(iso_code, config, data, geotiff_dir, out_file):
         model, 
         cam_extractor
     )
-    results["UID"] = data["UID"]
     results = filter_by_buildings(iso_code, config, results)
     results = data_utils._connect_components(results, buffer_size=0)
     results = results.sort_values("prob", ascending=False).drop_duplicates(["group"])
@@ -103,6 +101,7 @@ def generate_cam_bboxes(data, config, in_dir, model, cam_extractor, show=False):
                 geom.plot(facecolor='none', edgecolor='blue', ax=ax)
     results = gpd.GeoDataFrame(geometry=results, crs=crs)
     results["prob"] = data.prob
+    results["UID"] = data.UID
     return results
 
 
