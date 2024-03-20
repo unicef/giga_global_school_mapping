@@ -84,7 +84,7 @@ def main(c):
             logging=logging
         )
         # Evauate model
-        val_results, val_cm = cnn_utils.evaluate(
+        val_results, val_cm, val_preds = cnn_utils.evaluate(
             data_loader["test"], 
             classes, 
             model, 
@@ -101,7 +101,7 @@ def main(c):
             best_score = val_results["f1_score"]
             best_weights = model.state_dict()
 
-            eval_utils.save_results(val_results, val_cm, exp_dir)
+            eval_utils._save_files(val_results, val_cm, exp_dir)
             model_file = os.path.join(exp_dir, f"{exp_name}.pth")
             torch.save(model.state_dict(), model_file)
         logging.info(f"Best F1 score: {best_score}")
@@ -126,12 +126,13 @@ def main(c):
 
     # Calculate test performance using best model
     logging.info("\nTest Results")
-    test_results, test_cm = cnn_utils.evaluate(
+    test_results, test_cm, test_preds = cnn_utils.evaluate(
         data_loader["test"], classes, model, criterion, device, pos_label=1, wandb=wandb, logging=logging
     )
+    test_preds.to_csv(os.path.join(exp_dir, f"{exp_name}.csv"), index=False)
 
     # Save results in experiment directory
-    eval_utils.save_results(test_results, test_cm, exp_dir)
+    eval_utils._save_files(test_results, test_cm, exp_dir)
 
 
 if __name__ == "__main__":

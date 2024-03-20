@@ -65,28 +65,30 @@ def _sample_points(
 
     # Sample points from the microsoft raster
     points = points.to_crs("EPSG:3857")
-    ms_coord_list = [(x, y) for x, y in zip(points["geometry"].x, points["geometry"].y)]
+    coord_list = [(x, y) for x, y in zip(points["geometry"].x, points["geometry"].y)]
     
     points = points.to_crs("ESRI:54009")
     ghsl_coord_list = [(x, y) for x, y in zip(points["geometry"].x, points["geometry"].y)]
-    
     raster_dir = os.path.join(cwd, config["rasters_dir"])
-    ms_path = os.path.join(raster_dir, "ms_buildings", f"{iso_code}_ms.tif")
 
     # Filter points with pixel value greater than 0 and convert back to EPSG:4326
+    ms_path = os.path.join(raster_dir, "ms_buildings", f"{iso_code}_ms.tif")
     if os.path.exists(ms_path):
         with rio.open(ms_path) as src:
-            points['ms_val'] = [x[0] for x in src.sample(ms_coord_list)]
+            points['ms_val'] = [x[0] for x in src.sample(coord_list)]
+
+    ms_path = os.path.join(raster_dir, "google_buildings", f"{iso_code}_google.tif")
+    if os.path.exists(google_path):
+        with rio.open(google_path) as src:
+            points['google_val'] = [x[0] for x in src.sample(coord_list)]
 
     ghsl_path = os.path.join(raster_dir, "ghsl", config["ghsl_built_c_file"])
     with rio.open(ghsl_path) as src:
         col_val = 'ghsl_val'  if 'ms_val' in points.columns else 'pixel_val'
         points[col_val]  = [x[0] for x in src.sample(ghsl_coord_list)]
 
-    if 'ms_val' in points.columns:
-        points['pixel_val'] = points[['ms_val', 'ghsl_val']].max(axis=1)
+    points['pixel_val'] = points[['ms_val', 'google_val', 'ghsl_val']].max(axis=1)
     points = points[points['pixel_val'] > 0]
-        
     points = points.to_crs("EPSG:4326")
     return points
 
@@ -230,12 +232,10 @@ def _filter_uninhabited_locations(data, config, pbar):
 
     # Generate file paths based on the iso_code and source
     raster_dir = os.path.join(cwd, config["rasters_dir"])
-    src_path = os.path.join(raster_dir, "ms_buildings", f"{iso_code}_ms.tif")
+    ms_path = os.path.join(raster_dir, "ms_buildings", f"{iso_code}_ms.tif")
+    google_path = os.path.join(raster_dir, "google_buildings", f"{iso_code}_google.tif")
     ghsl_path = os.path.join(raster_dir, "ghsl", config["ghsl_built_c_file"])
-    if not os.path.exists(src_path):
-        src_path = ghsl_path
 
-    # Loop through each index in the DataFrame
     pixel_sums = []
     for index in range(len(data)):
         description = f"Processing {iso_code} {index}/{len(data)}"
@@ -246,10 +246,10 @@ def _filter_uninhabited_locations(data, config, pbar):
         subdata = subdata.to_crs("EPSG:3857")
         subdata["geometry"] = subdata["geometry"].buffer(buffer_size, cap_style=3)
 
-        # Mask the raster data with the buffered geometry
+        # Mask the raster data with the buffered geometry from Microsoft
         image = []
         pixel_sum = 0
-        with rio.open(src_path) as src:
+        with rio.open(ms_path) as src:
             try:
                 geometry = [subdata.iloc[0]["geometry"]]
                 image, transform = rio.mask.mask(src, geometry, crop=True)
@@ -258,8 +258,19 @@ def _filter_uninhabited_locations(data, config, pbar):
             except:
                 pass
 
-        # If no pixels found and source is not GHSL, attempt with GHSL data
-        if (pixel_sum == 0) and (src_path != ghsl_path):
+        # If no building pixels found, attempt with Google Open Buildings
+        if pixel_sum == 0:
+            with rio.open(google_path) as src:
+                try:
+                    geometry = [subdata.iloc[0]["geometry"]]
+                    image, transform = rio.mask.mask(src, geometry, crop=True)
+                    image[image == 255] = 1
+                    pixel_sum = np.sum(image)
+                except:
+                    pass
+
+        # If no building pixels found, attempt with GHSL data
+        if pixel_sum == 0:
             with rio.open(ghsl_path) as src:
                 subdata = subdata.to_crs("ESRI:54009")
                 geometry = [subdata.iloc[0]["geometry"]]
@@ -456,10 +467,12 @@ def clean_data(config, category, name="clean", source="ms", id="UID"):
         if not os.path.exists(out_subfile):
             # Join the dataset with ADM1 geoboundaries
             subdata = data[data["iso"] == iso_code].reset_index(drop=True)
+            logging.info(f"Dimensions: {subdata.shape}")
             geoboundaries = data_utils._get_geoboundaries(config, iso_code, adm_level="ADM1")
             geoboundaries = geoboundaries[["shapeName", "geometry"]].dropna(subset=["shapeName"])
             subdata = subdata.sjoin(geoboundaries, how="left", predicate="within")
             subdata[name], subdata[source] = 0, 0
+            logging.info(f"Dimensions: {subdata.shape}")
     
             # Split the data into smaller admin boundaries for scalability
             for shape_name in subdata.shapeName.unique():

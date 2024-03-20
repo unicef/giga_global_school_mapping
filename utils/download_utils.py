@@ -303,7 +303,7 @@ def load_unicef(config, category="school", source="unicef"):
     return data
 
 
-def _get_ms_country(config):
+def _get_country(config, source="ms"):
     """
     Match ISO country codes to Microsoft (MS) Building Footprints country names 
     using fuzzy string matching.
@@ -323,18 +323,20 @@ def _get_ms_country(config):
     matches = dict()
     for iso_code in iso_codes:
         country, _, _ = data_utils._get_iso_regions(config, iso_code)  
-        max_score = 0
-        for msf_country in msf_links.Location.unique():
-            msf_country_ = re.sub(r"(\w)([A-Z])", r"\1 \2", msf_country)
-            score = fuzz.partial_token_sort_ratio(country, msf_country_)
-                          
-            if score > max_score:
-                max_score = score
-                matches[iso_code] = msf_country
+        if source == "ms":
+            max_score = 0
+            for msf_country in msf_links.Location.unique():
+                msf_country_ = re.sub(r"(\w)([A-Z])", r"\1 \2", msf_country)
+                score = fuzz.partial_token_sort_ratio(country, msf_country_)           
+                if score > max_score:
+                    max_score = score
+                    matches[iso_code] = msf_country
+        else:
+            matches[iso_code] = country
     return matches
 
 
-def download_ms(config, source="ms", verbose=False):
+def download_buildings(config, source="ms", verbose=False):
     """
     Download and process Microsoft (MS) Building Footprints data for specified ISO country codes.
 
@@ -352,13 +354,9 @@ def download_ms(config, source="ms", verbose=False):
     This function uses leafmap and subprocess libraries for downloading MS buildings data,
     converting it to different formats, and storing it in specified directories.
     """
-
-    if "ms_matches" in config:
-        matches = config["ms_matches"]
-    else:
-        matches = _get_ms_country(config)
     iso_codes = config["iso_codes"]
-    
+    matches = _get_country(config, source)
+        
     for iso_code in (pbar := data_utils._create_progress_bar(iso_codes)):
         pbar.set_description(f"Processing {iso_code}")
         out_dir = data_utils._makedir(os.path.join(config["vectors_dir"], f"{source}_buildings"))
@@ -368,13 +366,35 @@ def download_ms(config, source="ms", verbose=False):
         out_file = str(os.path.join(out_dir, f"{iso_code}_{source}_EPSG4326.geojson"))
         if not os.path.exists(out_file):
             quiet = operator.not_(verbose)
-            leafmap.download_ms_buildings(country, out_dir=temp_dir, merge_output=out_file, quiet=quiet)
+            try:
+                if source == "ms":
+                    leafmap.download_ms_buildings(
+                        country, 
+                        out_dir=temp_dir, 
+                        merge_output=out_file,
+                        quiet=quiet,
+                        overwrite=True
+                    )
+                elif source == "google":
+                    leafmap.download_google_buildings(
+                        country, 
+                        out_dir=temp_dir, 
+                        merge_output=out_file, 
+                        quiet=quiet,
+                        overwrite=True
+                    )
+            except:
+                continue
     
         out_file_epsg3857 = str(os.path.join(out_dir, f"{iso_code}_{source}_EPSG3857.geojson"))
         tif_dir = data_utils._makedir(os.path.join(config["rasters_dir"], f"{source}_buildings"))
         tif_file = str(os.path.join(tif_dir, f"{iso_code}_{source}.tif"))
     
-        if (not os.path.exists(out_file_epsg3857)) and (not os.path.exists(tif_file)):
+        if (
+            (os.path.exists(out_file)) 
+            and (not os.path.exists(out_file_epsg3857)) 
+            and (not os.path.exists(tif_file))
+        ):
             command1 = "ogr2ogr -s_srs EPSG:4326 -t_srs EPSG:3857 {} {}".format(
                 out_file_epsg3857,
                 out_file

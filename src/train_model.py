@@ -16,25 +16,6 @@ import wandb
 
 cwd = os.path.dirname(os.getcwd())
 
-
-def save_results(test, target, pos_class, classes, results_dir, prefix=None, log=True):
-    if not os.path.exists(results_dir):
-        os.makedirs(results_dir)
-    results = eval_utils.get_results(
-        test[target], 
-        test["pred"], 
-        pos_class, 
-        classes, 
-        results_dir
-    )
-    if prefix: 
-        results = {f"{prefix}_{key}": val for key, val in results.items()}
-    if log: 
-        logging.info(results)
-        wandb.log(results)
-    return results
-    
-
 def main(iso, config):
     exp_name = f"{iso}-{config['config_name']}"
     wandb.run.name = exp_name
@@ -79,18 +60,18 @@ def main(iso, config):
 
     test["pred"] = preds
     pos_class = config["pos_class"]
-    results = save_results(test, target, pos_class, classes, results_dir)
+    results = eval_utils.save_results(test, target, pos_class, classes, results_dir)
 
     for rurban in ["urban", "rural"]:
         subresults_dir = os.path.join(results_dir, rurban)
         subtest = test[test.rurban == rurban]
-        results = save_results(subtest, target, pos_class, classes, subresults_dir, rurban)
+        results = eval_utils.save_results(subtest, target, pos_class, classes, subresults_dir, rurban)
     
     if len(config["iso_codes"]) > 1:
         for iso_code in config["iso_codes"]:
             subresults_dir = os.path.join(results_dir, iso_code)
             subtest = test[test.iso == iso_code]
-            results = save_results(
+            results = eval_utils.save_results(
                 subtest, 
                 target, 
                 pos_class, 
@@ -101,7 +82,7 @@ def main(iso, config):
             for rurban in ["urban", "rural"]:
                 subsubresults_dir = os.path.join(subresults_dir, rurban)
                 subsubtest = subtest[subtest.rurban == rurban]
-                results = save_results(
+                results = eval_utils.save_results(
                     subsubtest, 
                     target, 
                     pos_class, 

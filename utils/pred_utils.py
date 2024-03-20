@@ -28,6 +28,7 @@ import torchvision.transforms.functional as F
 import torchvision.transforms as transforms 
 from torchcam.methods import GradCAM, GradCAMpp, SmoothGradCAMpp, LayerCAM
 import rasterio as rio
+from rasterio.mask import mask
 from shapely import geometry
 import rasterio.plot
 
@@ -38,6 +39,11 @@ logging.basicConfig(level=logging.INFO)
 def cam_predict(iso_code, config, data, geotiff_dir, out_file):
     cwd = os.path.dirname(os.getcwd())
     classes = {1: config["pos_class"], 0: config["neg_class"]}
+
+    out_dir = os.path.join(cwd, "output", iso_code, "results")
+    out_file = os.path.join(out_dir, out_file)
+    if os.path.exists(out_file):
+        return gpd.read_file(out_file)
     
     exp_dir = os.path.join(cwd, config["exp_dir"], f"{iso_code}_{config['config_name']}")
     model_file = os.path.join(exp_dir, f"{iso_code}_{config['config_name']}.pth")
@@ -51,11 +57,10 @@ def cam_predict(iso_code, config, data, geotiff_dir, out_file):
         model, 
         cam_extractor
     )
-    results = filter_by_ms(iso_code, config, results)
+    results = filter_by_buildings(iso_code, config, results)
     results = data_utils._connect_components(results, buffer_size=0)
     results = results.sort_values("prob", ascending=False).drop_duplicates(["group"])
-    out_dir = os.path.join(cwd, "output", iso_code, "results")
-    results.to_file(os.path.join(out_dir, out_file), driver="GPKG")
+    results.to_file(out_file, driver="GPKG")
     return results
 
 
@@ -96,6 +101,7 @@ def generate_cam_bboxes(data, config, in_dir, model, cam_extractor, show=False):
                 geom.plot(facecolor='none', edgecolor='blue', ax=ax)
     results = gpd.GeoDataFrame(geometry=results, crs=crs)
     results["prob"] = data.prob
+    results["UID"] = data.UID
     return results
 
 
@@ -174,7 +180,8 @@ def generate_bbox_from_cam(cam_map, image, buffer=75):
         x-buffer, 
         y-buffer, 
         (x + (image.size[0]//cms)) + buffer, 
-        (y + (image.size[1]//cms)) + buffer]])
+        (y + (image.size[1]//cms)) + buffer
+    ]])
     draw_boxes = torchvision.utils.draw_bounding_boxes(
         image=transforms.PILToTensor()(image), 
         boxes=boxes,
@@ -353,22 +360,47 @@ def vit_pred(data, config, iso_code, shapename, sat_dir, id_col="UID"):
     return results
 
 
-def filter_by_ms(iso_code, config, data):
-    filtered = []
+def filter_by_buildings(iso_code, config, data, miniters=1000):
     cwd = os.path.dirname(os.getcwd())
-    ms_dir = os.path.join(cwd, config["vectors_dir"], "ms_buildings", iso_code)
-    pbar = data_utils._create_progress_bar(os.listdir(ms_dir))
-    for file in pbar:
-        filename = os.path.join(ms_dir, file)
-        ms = gpd.read_file(filename)
-        ms = ms.to_crs(data.crs)
-        filtered.append(
-            gpd.sjoin(data, ms, predicate='intersects', how="inner")
-        )
+    raster_dir = os.path.join(cwd, config["rasters_dir"])
+    ms_path = os.path.join(raster_dir, "ms_buildings", f"{iso_code}_ms.tif")
+    google_path = os.path.join(raster_dir, "google_buildings", f"{iso_code}_google.tif")
+    ghsl_path = os.path.join(raster_dir, "ghsl", config["ghsl_built_c_file"])
+
+    pixel_sums = []
+    bar_format = "{l_bar}{bar:20}{r_bar}{bar:-20b}"
+    pbar = tqdm(
+        range(len(data)), 
+        total=len(data), 
+        miniters=int(len(data)/miniters),
+        bar_format=bar_format
+    )
+    for index in pbar:
+        subdata = data.iloc[[index]]
+        pixel_sum = 0
+        with rio.open(ms_path) as src:
+            try:
+                geometry = [subdata.iloc[0]["geometry"]]
+                image, transform = rio.mask.mask(src, geometry, crop=True)
+                image[image == 255] = 1
+                pixel_sum = np.sum(image)
+            except:
+                pass
+        if pixel_sum == 0 and os.path.exists(google_path):
+            with rio.open(google_path) as src:
+                try:
+                    geometry = [subdata.iloc[0]["geometry"]]
+                    image, transform = rio.mask.mask(src, geometry, crop=True)
+                    image[image == 255] = 1
+                    pixel_sum = np.sum(image)
+                except:
+                    pass
+        pixel_sums.append(pixel_sum) 
         
-    filtered = gpd.GeoDataFrame(pd.concat(filtered), geometry="geometry")
-    filtered = filtered.drop_duplicates("geometry", keep="first")
-    return filtered
+    data["sum"] = pixel_sums
+    data = data[data["sum"] > 0]
+    data = data.reset_index(drop=True)
+    return data
 
 
 def generate_pred_tiles(config, iso_code, spacing, buffer_size, adm_level="ADM2", shapename=None):
@@ -378,7 +410,6 @@ def generate_pred_tiles(config, iso_code, spacing, buffer_size, adm_level="ADM2"
     
     if os.path.exists(out_file):
         data = gpd.read_file(out_file)
-        data["points"] = data["geometry"].centroid
         return data
     
     points = data_utils._generate_samples(
@@ -391,9 +422,10 @@ def generate_pred_tiles(config, iso_code, spacing, buffer_size, adm_level="ADM2"
     )
     points["points"] = points["geometry"]
     points["geometry"] = points.buffer(buffer_size, cap_style=3)
-
-    filtered = filter_by_ms(iso_code, config, points)
-    filtered["UID"] = list(filtered.index)
-    filtered[["UID", "geometry"]].to_file(out_file, driver="GPKG")
+    points["UID"] = list(points.index)
+    
+    filtered = filter_by_buildings(iso_code, config, points)
+    filtered = filtered[["UID", "geometry", "shapeName", "sum"]]
+    filtered.to_file(out_file, driver="GPKG", index=False)
 
     return filtered
