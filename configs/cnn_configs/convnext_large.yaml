@@ -3,7 +3,7 @@ batch_size: 32
 n_workers: 4
 n_epochs: 60
 
-model: "convnext_small"
+model: "convnext_large"
 pretrained: True
 scheduler: "ReduceLROnPlateau"
 optimizer: "Adam"
